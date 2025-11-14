@@ -1,14 +1,17 @@
 # 🌜🎵moonsong
 
 ⚒️Git: https://github.com/Hyeongnnin/moonsong.git
+
 📝Notion: https://www.notion.so/Team-Project-Templates-2a3119806a3481d6b607dba31685abed?source=copy_link
 
 
 ## Team
-### Lee Sang Hyeop - Hyeop
-🧑‍💼Chief Executive Officer
-### Park Hyeong Min - Hyeong
-👨‍🔧Chief Technical Officer
+### 🧑‍💼Chief Executive Officer
+Lee Sang Hyeop - Hyeop
+
+### 👨‍🔧Chief Technical Officer
+Park Hyeong Min - Hyeong
+
 
 ## lib
 - asgiref==3.9.1
