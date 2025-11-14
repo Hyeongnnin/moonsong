@@ -6,4 +6,4 @@ https://github.com/Hyeongnnin/moonsong.git
 ### Lee Sang Hyeop - Hyeop
 Chief Executive Officer
 ### Park Hyeong Min - Hyeong
-Chief Technician Officer
+Chief Technical Officer
