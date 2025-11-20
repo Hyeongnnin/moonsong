@@ -20,3 +20,15 @@ Park Hyeong Min - Hyeong
 - sqlparse==0.5.3
 - typing_extensions==4.14.1
 - tzdata==2025.2
+
+## 여는방법
+
+django 
+: cd backend
+python manage.py migrate
+python manage.py runserver 
+
+프론트 
+cd ../frontend
+npm install
+npm run dev
