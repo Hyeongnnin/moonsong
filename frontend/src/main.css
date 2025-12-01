@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Global Pretendard Font */
+html, body {
+	font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+		Roboto, 'Helvetica Neue', Arial, 'Noto Sans KR', sans-serif;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+:root {
+	/* Brand (primary) color set based on #DE5D35 (orange-brick) */
+	--color-brand-50:  #fff7f5;
+	--color-brand-100: #fdeee9;
+	--color-brand-200: #fbd4c6;
+	--color-brand-300: #f7a88b;
+	--color-brand-400: #f0744c; /* primary-light */
+	--color-brand-500: #e0603f;
+	--color-brand-600: #DE5D35; /* primary */
+	--color-brand-700: #C64F2C; /* primary-hover (slightly darker) */
+	--color-brand-800: #9b361f;
+	--color-brand-900: #6e2416;
+
+	/* semantic aliases */
+	--color-primary: var(--color-brand-600);
+	--color-primary-hover: var(--color-brand-700);
+	--color-primary-light: var(--color-brand-400);
+	--color-primary-contrast: var(--color-brand-50);
+	--color-accent: var(--color-brand-500);
+}
+
+/* Utility to quickly use CSS vars in components if needed */
+.btn-brand {
+	background-color: var(--color-primary);
+	color: white;
+}
+.btn-brand:hover {
+	background-color: var(--color-primary-hover);
+}

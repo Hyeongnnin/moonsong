@@ -1,61 +1,148 @@
 <template>
   <div class="min-h-screen bg-white">
     <!-- Hero Section -->
-    <section class="pt-24 pb-16 bg-gradient-to-b from-blue-50 to-white">
+    <section class="pt-24 pb-16 bg-gradient-to-b from-brand-50 to-white">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="grid md:grid-cols-2 gap-12 items-center">
-          <div class="space-y-6">
-            <div class="inline-block px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold">
-              AI 설문으로 3분만에 근로현장 점검
+          <div>
+            <div class="inline-flex items-center px-3 py-1 bg-brand-100 text-brand-700 rounded-full text-sm mb-4">
+              <span class="w-2 h-2 rounded-full bg-brand-500 mr-2" />
+              청년·알바생을 위한 노동법률 진단 서비스
             </div>
-            <h1 class="text-4xl sm:text-5xl leading-tight text-gray-900">
-              <span class="text-blue-600">근로 권리</span>를<br />
-              쉽고 정확하게 진단받으세요
+            
+            <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold mb-6 tracking-tight text-gray-900 leading-tight">
+              <span class="block">내 근로 계약,</span>
+              <span class="block text-brand-600">법적으로 안전할까?</span>
             </h1>
-            <p class="text-gray-600 text-lg">
-              복잡한 법률 상담 없이, AI 설문만으로<br />
-              사업장의 노동법 준수 여부를 진단하고 전문가를 매칭받을 수 있어요
+            
+            <p class="text-lg text-gray-600 mb-6 leading-relaxed">
+              근로계약서의 내용을 AI가 분석하고, 노동법률 전문가가 검토하여
+              <span class="font-semibold"> 임금, 근로시간, 휴게, 주휴수당</span> 등 필수 항목을 진단해 드립니다.
             </p>
-            <div class="flex flex-wrap gap-4">
-              <button
-                type="button"
-                class="inline-flex items-center justify-center gap-2 rounded-full bg-blue-600 px-8 py-3 text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700"
-                @click="navigateTo('rights-check')"
+            
+            <div class="flex flex-col sm:flex-row gap-4 mb-8">
+              <button 
+                class="px-8 py-3 text-base font-semibold bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors flex items-center justify-center"
+                @click="router.push('/dashboard')"
               >
-                내 권리 알아보기
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14m-7-7 7 7-7 7" />
-                </svg>
+                지금 진단 시작하기
+                <span class="ml-2">→</span>
               </button>
-              <button
-                type="button"
-                class="inline-flex items-center justify-center rounded-full border border-gray-300 px-8 py-3 text-gray-800 transition hover:bg-gray-50"
-                @click="scrollToSection('features')"
+              
+              <button 
+                class="px-8 py-3 text-base font-semibold border-2 border-gray-300 text-gray-800 rounded-lg hover:bg-gray-50 transition-colors"
+                @click="router.push('/signup')"
               >
-                서비스 소개
+                회원가입하고 더 안전하게
               </button>
             </div>
-            <div class="flex items-center gap-8 pt-4 text-base">
-              <div>
-                <div class="text-blue-600 font-semibold text-xl">12,567명</div>
-                <div class="text-gray-500">누적 진단</div>
+            
+            <div class="flex flex-wrap items-center gap-6 text-sm text-gray-500">
+              <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-brand-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 15a5 5 0 100-10 5 5 0 000 10zm0-2a3 3 0 100-6 3 3 0 000 6z"/></svg>
+                <span>노동법률 전문가 검토</span>
               </div>
-              <div class="w-px h-12 bg-gray-200"></div>
-              <div>
-                <div class="text-blue-600 font-semibold text-xl">500+ 전문가</div>
-                <div class="text-gray-500">노무사 네트워크</div>
+              <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-brand-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.5H7a1 1 0 100 2h4a1 1 0 001-1V7z"/></svg>
+                <span>5분 내 간편 진단</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-brand-500" fill="currentColor" viewBox="0 0 20 20"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
+                <span>모바일에서도 간편하게</span>
               </div>
             </div>
           </div>
+          
           <div class="relative">
-            <div class="rounded-2xl overflow-hidden shadow-2xl">
-              <img
-                :src="heroImageSrc"
-                alt="앱 미리보기"
-                class="w-full h-auto object-cover"
-                loading="lazy"
-                @error="onHeroImageError"
-              />
+            <div class="absolute -top-8 -left-8 w-40 h-40 bg-brand-100 rounded-full blur-3xl opacity-60" />
+            <div class="absolute -bottom-12 -right-8 w-40 h-40 bg-brand-200 rounded-full blur-3xl opacity-60" />
+            
+            <div class="relative bg-white rounded-3xl shadow-2xl p-6 border border-gray-100">
+              <div class="flex items-center justify-between mb-4">
+                <div>
+                  <h3 class="text-lg font-semibold text-gray-900">알바 근로계약서 진단</h3>
+                  <p class="text-sm text-gray-500">OO카페 / 파트타임 / 시급제</p>
+                </div>
+                <span class="inline-flex items-center px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-medium">
+                  진단 진행 중
+                </span>
+              </div>
+
+              <div class="space-y-3 mb-4">
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                  <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center">
+                      <span class="text-brand-600 text-sm font-semibold">임금</span>
+                    </div>
+                    <div>
+                      <p class="text-sm font-medium text-gray-900">시급 및 주휴수당</p>
+                      <p class="text-xs text-gray-500">최저임금 및 주휴수당 포함 여부</p>
+                    </div>
+                  </div>
+                  <span class="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700 font-medium">
+                    양호
+                  </span>
+                </div>
+
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                  <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center">
+                      <span class="text-brand-600 text-sm font-semibold">시간</span>
+                    </div>
+                    <div>
+                      <p class="text-sm font-medium text-gray-900">근로시간 및 휴게시간</p>
+                      <p class="text-xs text-gray-500">법정 근로시간·휴게시간 준수 여부</p>
+                    </div>
+                  </div>
+                  <span class="text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-700 font-medium">
+                    확인 필요
+                  </span>
+                </div>
+
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                  <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center">
+                      <span class="text-brand-600 text-sm font-semibold">계약</span>
+                    </div>
+                    <div>
+                      <p class="text-sm font-medium text-gray-900">계약 기간 및 갱신</p>
+                      <p class="text-xs text-gray-500">계약 갱신·해지 조건의 명확성</p>
+                    </div>
+                  </div>
+                  <span class="text-xs px-2 py-1 rounded-full bg-red-100 text-red-700 font-medium">
+                    위험
+                  </span>
+                </div>
+              </div>
+
+              <div class="p-3 bg-brand-50 rounded-xl flex items-start gap-3 mb-4">
+                <div class="mt-1">
+                  <svg class="w-4 h-4 text-brand-600" fill="currentColor" viewBox="0 0 20 20"><path d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z"/></svg>
+                </div>
+                <div>
+                  <p class="text-xs font-medium text-brand-900 mb-1">노무사 코멘트 요약</p>
+                  <p class="text-xs text-brand-800">
+                    주휴수당 산정 방식에 일부 문제가 있어 보이며, 근로계약서 상 계약 종료 사유가 모호하게 기재되어 있습니다.
+                    필요시 상담을 통해 구체적인 조언을 받아보세요.
+                  </p>
+                </div>
+              </div>
+
+              <div class="flex flex-col sm:flex-row gap-3">
+                <button class="flex-1 px-4 py-2 text-sm font-semibold bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors">
+                  상세 진단 결과 보기
+                </button>
+                <button 
+                  class="flex-1 px-4 py-2 text-sm font-semibold border border-gray-300 text-gray-800 rounded-lg hover:bg-gray-50 transition-colors"
+                  @click="router.push('/login')"
+                >
+                  전문가 상담 신청
+                </button>
+              </div>
+            </div>
+
+            <div class="mt-6 text-xs text-gray-500 text-center">
+              실제 화면과 다를 수 있으며, 예시 화면입니다.
             </div>
           </div>
         </div>
@@ -65,170 +152,312 @@
     <!-- Features Section -->
     <section id="features" class="py-20 bg-white">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="text-center mb-16">
-          <h2 class="text-4xl mb-4 font-semibold text-gray-900">왜 노타브일까요?</h2>
-          <p class="text-gray-600 text-lg">복잡한 노동법률, 이제는 쉽고 정확하게</p>
+        <div class="text-center mb-12">
+          <h2 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+            이렇게 진단해 드려요
+          </h2>
+          <p class="text-gray-500 max-w-2xl mx-auto">
+            근로계약서의 핵심 항목을 기준으로, 임금·근로시간·휴게·주휴수당·해고 등
+            주요 노동법 이슈를 AI와 전문가가 함께 검토합니다.
+          </p>
         </div>
 
         <div class="grid md:grid-cols-3 gap-8">
-          <article
-            v-for="feature in features"
-            :key="feature.title"
-            class="p-8 rounded-2xl border border-gray-200 hover:shadow-lg transition-shadow"
-          >
-            <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-6">
-              <svg
-                v-if="feature.icon === 'clock'"
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-6 w-6 text-blue-600"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <circle cx="12" cy="12" r="9" />
-                <path d="M12 7v5l3 2" />
-              </svg>
-              <svg
-                v-else-if="feature.icon === 'shield'"
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-6 w-6 text-blue-600"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path d="M12 22s8-4 8-10V5L12 2 4 5v7c0 6 8 10 8 10z" />
-                <path d="m9 12 2 2 4-4" />
-              </svg>
-              <svg
-                v-else
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-6 w-6 text-blue-600"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <rect x="7" y="2" width="10" height="20" rx="2" ry="2" />
-                <path d="M11 18h2" />
-              </svg>
+          <div class="p-6 border border-gray-100 shadow-sm rounded-lg bg-white">
+            <div class="w-10 h-10 rounded-full bg-brand-50 flex items-center justify-center mb-4">
+              <span class="text-brand-600 font-semibold">01</span>
             </div>
-            <h3 class="text-xl font-semibold mb-4 text-gray-900">{{ feature.title }}</h3>
-            <p class="text-gray-600 leading-relaxed">{{ feature.description }}</p>
-          </article>
+            <h3 class="text-lg font-semibold mb-2">근로계약서 업로드</h3>
+            <p class="text-sm text-gray-500 mb-4">
+              사진이나 파일로 근로계약서를 업로드하면, AI가 내용을 자동으로 인식합니다.
+            </p>
+            <ul class="space-y-1 text-sm text-gray-500">
+              <li class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-brand-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                이미지·PDF·문서 파일 지원
+              </li>
+              <li class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-brand-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                개인정보는 안전하게 암호화
+              </li>
+            </ul>
+          </div>
+
+          <div class="p-6 border border-gray-100 shadow-sm rounded-lg bg-white">
+            <div class="w-10 h-10 rounded-full bg-brand-50 flex items-center justify-center mb-4">
+              <span class="text-brand-600 font-semibold">02</span>
+            </div>
+            <h3 class="text-lg font-semibold mb-2">AI 노동법률 진단</h3>
+            <p class="text-sm text-gray-500 mb-4">
+              업로드된 계약서를 바탕으로 임금, 근로시간, 휴게시간, 휴일, 수당 등
+              필수 항목을 점검합니다.
+            </p>
+            <ul class="space-y-1 text-sm text-gray-500">
+              <li class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-brand-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                위험·주의·양호 항목 한눈에 확인
+              </li>
+              <li class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-brand-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                문제가 될 수 있는 조항 자동 표시
+              </li>
+            </ul>
+          </div>
+
+          <div class="p-6 border border-gray-100 shadow-sm rounded-lg bg-white">
+            <div class="w-10 h-10 rounded-full bg-brand-50 flex items-center justify-center mb-4">
+              <span class="text-brand-600 font-semibold">03</span>
+            </div>
+            <h3 class="text-lg font-semibold mb-2">전문가 상담 연계</h3>
+            <p class="text-sm text-gray-500 mb-4">
+              필요시 공인 노무사와의 1:1 온라인 상담으로 구체적인 대응 방안을 안내받을 수 있습니다.
+            </p>
+            <ul class="space-y-1 text-sm text-gray-500">
+              <li class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-brand-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                플랫폼 내 안전한 상담 시스템
+              </li>
+              <li class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-brand-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                상담 이력 및 진단 결과 저장
+              </li>
+            </ul>
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- How it works Section -->
-    <section id="howto" class="py-20 bg-gray-50">
+    <!-- Target Users Section -->
+    <section class="py-20 bg-brand-50/50">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="text-center mb-16">
-          <h2 class="text-4xl mb-4 font-semibold text-gray-900">이용 방법</h2>
-          <p class="text-gray-600 text-lg">간단한 3단계로 근로 권리를 지켜보세요</p>
-        </div>
+        <div class="grid md:grid-cols-2 gap-10 items-center">
+          <div>
+            <h2 class="text-3xl font-bold text-gray-900 mb-4">
+              이런 분들이 주로 이용해요
+            </h2>
+            <p class="text-gray-600 mb-6">
+              특히 첫 알바, 첫 직장 생활을 준비하는 청년·알바생 여러분께
+              <span class="font-semibold"> 필수적인 서비스</span>입니다.
+            </p>
+            
+            <div class="space-y-4">
+              <div class="flex gap-3">
+                <div class="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center mt-1 flex-shrink-0">
+                  <span class="text-brand-600 text-sm font-semibold">A</span>
+                </div>
+                <div>
+                  <p class="text-sm font-semibold text-gray-900">
+                    첫 아르바이트를 시작하는 고3·대학생
+                  </p>
+                  <p class="text-sm text-gray-500">
+                    근로계약서를 처음 받아보는 분들, 무엇을 확인해야 할지 막막한 분들
+                  </p>
+                </div>
+              </div>
 
-        <div class="grid md:grid-cols-3 gap-8">
-          <article v-for="(step, index) in steps" :key="step.title" class="text-center">
-            <div class="w-16 h-16 bg-blue-600 text-white text-2xl font-semibold rounded-full flex items-center justify-center mx-auto mb-6">
-              {{ index + 1 }}
+              <div class="flex gap-3">
+                <div class="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center mt-1 flex-shrink-0">
+                  <span class="text-brand-600 text-sm font-semibold">B</span>
+                </div>
+                <div>
+                  <p class="text-sm font-semibold text-gray-900">
+                    계약 변경·연장을 앞둔 알바생
+                  </p>
+                  <p class="text-sm text-gray-500">
+                    시급 조정, 근로시간 변경, 계약 연장 등 조건 변경이 고민되는 분들
+                  </p>
+                </div>
+              </div>
+
+              <div class="flex gap-3">
+                <div class="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center mt-1 flex-shrink-0">
+                  <span class="text-brand-600 text-sm font-semibold">C</span>
+                </div>
+                <div>
+                  <p class="text-sm font-semibold text-gray-900">
+                    카페·음식점·편의점 등 서비스 업종 종사자
+                  </p>
+                  <p class="text-sm text-gray-500">
+                    주휴수당, 야간수당 등 수당 관련 문제가 걱정되는 분들
+                  </p>
+                </div>
+              </div>
             </div>
-            <h3 class="text-xl font-semibold mb-3 text-gray-900">{{ step.title }}</h3>
-            <p class="text-gray-600 leading-relaxed" v-html="step.description"></p>
-          </article>
+          </div>
+
+          <div class="rounded-2xl overflow-hidden shadow-2xl bg-gray-200 h-96">
+            <div class="w-full h-full flex items-center justify-center text-gray-500">
+              [이미지 영역]
+            </div>
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- Reviews Section -->
-    <section id="reviews" class="py-20 bg-white">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="text-center mb-16">
-          <h2 class="text-4xl mb-4 font-semibold text-gray-900">이용자 후기</h2>
-          <p class="text-gray-600 text-lg">1만 2천 명이 경험한 근로현장 법률진단 서비스</p>
+    <!-- FAQ Section -->
+    <section class="py-16 bg-white" id="service">
+      <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-10">
+          <h2 class="text-3xl font-bold text-gray-900 mb-3">
+            자주 묻는 질문
+          </h2>
+          <p class="text-gray-500 text-sm">
+            알바생·청년들이 가장 많이 궁금해하는 내용을 모았어요.
+          </p>
         </div>
 
-        <div class="grid md:grid-cols-3 gap-6">
-          <article v-for="review in reviews" :key="review.name" class="p-6 rounded-2xl border border-gray-200">
-            <div class="flex items-center gap-3 mb-4">
-              <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-semibold text-lg">
-                {{ review.name.charAt(0) }}
+        <div class="space-y-4">
+          <div class="p-4 sm:p-5 border border-gray-100 rounded-lg bg-white">
+            <div class="flex gap-3">
+              <div class="mt-1 flex-shrink-0">
+                <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-brand-50 text-brand-600 text-xs font-semibold">
+                  Q
+                </span>
               </div>
               <div>
-                <div class="text-gray-900 font-semibold">{{ review.name }}</div>
-                <div class="text-blue-600 text-sm">{{ review.job }}</div>
+                <p class="text-sm font-semibold text-gray-900 mb-1">
+                  근로계약서를 쓰지 않았는데, 진단이 가능한가요?
+                </p>
+                <p class="text-sm text-gray-500">
+                  네. 근로계약서를 작성하지 않은 경우에도, 현재 일하고 있는 조건(시급, 근무 시간, 휴게시간 등)을 
+                  간단히 입력하면 기본적인 노동법 위반 여부를 확인할 수 있습니다.
+                </p>
               </div>
             </div>
-            <p class="text-gray-600 leading-relaxed">{{ review.review }}</p>
-            <div class="flex gap-1 mt-4 text-yellow-400">
-              <span v-for="star in 5" :key="`${review.name}-${star}`">★</span>
+          </div>
+
+          <div class="p-4 sm:p-5 border border-gray-100 rounded-lg bg-white">
+            <div class="flex gap-3">
+              <div class="mt-1 flex-shrink-0">
+                <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-brand-50 text-brand-600 text-xs font-semibold">
+                  Q
+                </span>
+              </div>
+              <div>
+                <p class="text-sm font-semibold text-gray-900 mb-1">
+                  진단 결과에 문제가 있다고 나오면, 바로 신고해야 하나요?
+                </p>
+                <p class="text-sm text-gray-500">
+                  꼭 그렇지는 않습니다. 먼저 사업장과의 대화를 시도해 볼 수 있으며, 
+                  필요시 공인 노무사와의 상담을 통해 대응 방법을 안내받을 수 있습니다.
+                </p>
+              </div>
             </div>
-          </article>
+          </div>
+
+          <div class="p-4 sm:p-5 border border-gray-100 rounded-lg bg-white">
+            <div class="flex gap-3">
+              <div class="mt-1 flex-shrink-0">
+                <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-brand-50 text-brand-600 text-xs font-semibold">
+                  Q
+                </span>
+              </div>
+              <div>
+                <p class="text-sm font-semibold text-gray-900 mb-1">
+                  서비스 이용에 비용이 드나요?
+                </p>
+                <p class="text-sm text-gray-500">
+                  기본적인 근로계약서 진단은 무료로 제공되며, 전문가와의 1:1 상담은 별도의 비용이 발생할 수 있습니다.
+                  자세한 요금 체계는 추후 정식 오픈 시 안내될 예정입니다.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
 
     <!-- CTA Section -->
-    <section class="py-20 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-center">
-      <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h2 class="text-4xl mb-6 font-semibold">지금 바로 시작하세요</h2>
-        <p class="mb-8 opacity-90 text-lg">
-          근로현장의 법률 문제, 단 3분만에 진단하고 해결하세요
-        </p>
-        <button
-          type="button"
-          class="inline-flex items-center justify-center gap-2 rounded-full bg-white text-blue-600 px-8 py-3 font-semibold transition hover:bg-gray-100"
-          @click="navigateTo('rights-check')"
-        >
-          무료로 진단 받기
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14m-7-7 7 7-7 7" />
-          </svg>
-        </button>
+    <section class="py-16 bg-brand-600 text-white">
+      <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="grid md:grid-cols-2 gap-10 items-center">
+          <div>
+            <h2 class="text-3xl font-bold mb-4">
+              지금 내 근로계약서,<br />한번 점검해 볼까요?
+            </h2>
+            <p class="text-brand-100 mb-6 text-sm sm:text-base">
+              작은 의심도 괜찮아요. 
+              임금·근로시간·휴게·주휴수당·계약조건 등, 
+              혼자 고민하지 말고 노타브와 함께 확인해 보세요.
+            </p>
+            <div class="flex flex-col sm:flex-row gap-3">
+              <button 
+                class="bg-white text-brand-700 hover:bg-brand-50 font-semibold px-6 py-3 rounded-lg transition-colors"
+                @click="router.push('/dashboard')"
+              >
+                바로 진단 시작하기
+              </button>
+              <button 
+                class="border-2 border-white text-white hover:bg-brand-500 font-semibold px-6 py-3 rounded-lg transition-colors"
+                @click="router.push('/signup')"
+              >
+                회원가입하고 이용하기
+              </button>
+            </div>
+          </div>
+
+          <div class="space-y-4 text-sm text-brand-100">
+            <div class="flex gap-3">
+              <svg class="w-4 h-4 mt-1 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              <p>AI 자동 진단과 노무사 검토를 통해 보다 정확한 진단을 제공합니다.</p>
+            </div>
+            <div class="flex gap-3">
+              <svg class="w-4 h-4 mt-1 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              <p>근로계약서가 없어도, 현재 일하는 조건을 기준으로 기본 진단이 가능합니다.</p>
+            </div>
+            <div class="flex gap-3">
+              <svg class="w-4 h-4 mt-1 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              <p>진단 및 상담 내용은 안전하게 보호되며, 본인 동의 없이 외부에 공유되지 않습니다.</p>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
     <!-- Footer -->
-    <footer class="bg-gray-900 text-gray-400 py-12">
+    <footer class="py-10 bg-gray-900 text-gray-400">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="grid md:grid-cols-4 gap-8">
+        <div class="flex flex-col md:flex-row justify-between gap-8 mb-6">
           <div>
-            <h3 class="text-white text-xl font-semibold mb-4">노타브</h3>
-            <p>청년을 위한 근로현장 법률진단 서비스</p>
+            <div class="flex items-center gap-2 mb-3">
+              <span class="text-xl font-semibold text-white">노타브</span>
+              <span class="text-xs px-2 py-1 rounded-full bg-brand-600 text-white">
+                Beta
+              </span>
+            </div>
+            <p class="text-sm text-gray-500 max-w-md">
+              청년·알바생·직장인의 안전한 노동 환경을 위해, 근로계약서 진단과 노동법률 상담을 쉽고 간편하게 제공합니다.
+            </p>
           </div>
-          <div>
-            <h4 class="text-white font-semibold mb-4">서비스</h4>
-            <ul class="space-y-2">
-              <li><a href="#" class="hover:text-white transition">AI 법률 진단</a></li>
-              <li><a href="#" class="hover:text-white transition">진단 보고서</a></li>
-              <li><a href="#" class="hover:text-white transition">노무사 매칭</a></li>
-            </ul>
-          </div>
-          <div>
-            <h4 class="text-white font-semibold mb-4">고객지원</h4>
-            <ul class="space-y-2">
-              <li><a href="#" class="hover:text-white transition">자주 묻는 질문</a></li>
-              <li><a href="#" class="hover:text-white transition">공지사항</a></li>
-              <li><a href="#" class="hover:text-white transition">1:1 문의</a></li>
-            </ul>
-          </div>
-          <div>
-            <h4 class="text-white font-semibold mb-4">정보</h4>
-            <ul class="space-y-2">
-              <li><a href="#" class="hover:text-white transition">회사 소개</a></li>
-              <li><a href="#" class="hover:text-white transition">이용약관</a></li>
-              <li><a href="#" class="hover:text-white transition">개인정보처리방침</a></li>
-            </ul>
+
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-6 text-sm">
+            <div>
+              <h4 class="text-white mb-4">서비스</h4>
+              <ul class="space-y-2">
+                <li><a href="#features" class="hover:text-white">근로계약서 진단</a></li>
+                <li><a href="#service" class="hover:text-white">노동법 Q&A</a></li>
+                <li><a href="#" class="hover:text-white">노무사 상담</a></li>
+              </ul>
+            </div>
+            <div>
+              <h4 class="text-white mb-4">지원</h4>
+              <ul class="space-y-2">
+                <li><a href="#" class="hover:text-white">자주 묻는 질문</a></li>
+                <li><a href="#" class="hover:text-white">공지사항</a></li>
+                <li><a href="#" class="hover:text-white">1:1 문의</a></li>
+              </ul>
+            </div>
+            <div>
+              <h4 class="text-white mb-4">정보</h4>
+              <ul class="space-y-2">
+                <li><a href="#" class="hover:text-white">회사 소개</a></li>
+                <li><a href="#" class="hover:text-white">이용약관</a></li>
+                <li><a href="#" class="hover:text-white">개인정보처리방침</a></li>
+              </ul>
+            </div>
           </div>
         </div>
-        <div class="border-t border-gray-800 mt-12 pt-8 text-center text-sm">
+        <div class="border-t border-gray-800 mt-12 pt-8 text-center">
           <p>&copy; 2025 노타브. All rights reserved.</p>
         </div>
       </div>
@@ -237,82 +466,6 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
-
-type PageKey = 'landing' | 'login' | 'signup' | 'personal-signup' | 'lawyer-signup' | 'rights-check'
-
-const router = useRouter()
-
-const features = [
-  {
-    icon: 'clock',
-    title: 'AI로 3분 진단',
-    description: '복잡한 법률 용어 없이 간단한 AI 설문만으로 사업장의 노동법 준수 여부를 정확하게 진단할 수 있어요',
-  },
-  {
-    icon: 'shield',
-    title: '전문 보고서 제공',
-    description: '진단 결과를 바탕으로 구체적인 법률 위반 사항과 개선 방안을 담은 보고서를 제공합니다',
-  },
-  {
-    icon: 'phone',
-    title: '전문 노무사 매칭',
-    description: '필요시 경험 많은 노무사를 즉시 매칭해드려 구체적인 법률 상담과 문제 해결을 지원합니다',
-  },
-] as const
-
-const steps = [
-  {
-    title: 'AI 설문 진단',
-    description: '간단한 질문에 답하면<br />AI가 사업장을 정밀 진단합니다',
-  },
-  {
-    title: '진단 보고서 확인',
-    description: '노동법 위반 사항과<br />개선 방안을 담은 보고서를 받아보세요',
-  },
-  {
-    title: '전문가 매칭',
-    description: '필요시 전문 노무사와<br />1:1 상담을 진행하세요',
-  },
-] as const
-
-const reviews = [
-  { name: '김**', job: '카페 아르바이트', review: '급여 체불 문제를 해결할 수 있었어요. 노무사님과 상담도 도움이 됐습니다!' },
-  { name: '이**', job: '편의점 알바', review: '법률 용어 몰라도 설문만 하면 되니까 너무 편했어요. 제 권리를 알게 됐어요.' },
-  { name: '박**', job: '배달 라이더', review: '주휴수당 못 받고 있었는데 진단 받고 바로 해결했습니다. 추천해요!' },
-] as const
-
-const heroImagePrimary =
-  'https://images.unsplash.com/photo-1605108222700-0d605d9ebafe?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb2JpbGUlMjBwaG9uZSUyMGFwcHxlbnwxfHx8fDE3NjMwNTA3MDF8MA&ixlib=rb-4.1.0&q=80&w=1080'
-const heroImageFallback = 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=1080&q=80'
-const heroImageSrc = ref(heroImagePrimary)
-
-const onHeroImageError = () => {
-  heroImageSrc.value = heroImageFallback
-}
-
-const navigateTo = (page: PageKey) => {
-  if (page === 'landing') {
-    router.push('/')
-    return
-  }
-
-  const routeMap: Record<Exclude<PageKey, 'landing'>, string> = {
-    login: '/login',
-    signup: '/signup',
-    'personal-signup': '/signup/personal',
-    'lawyer-signup': '/signup/lawyer',
-    'rights-check': '/rights-check',
-  }
-
-  router.push(routeMap[page])
-}
-
-const scrollToSection = (sectionId: string) => {
-  const element = document.getElementById(sectionId)
-  if (element) {
-    element.scrollIntoView({ behavior: 'smooth' })
-  }
-}
+import { useRouter } from 'vue-router';
+const router = useRouter();
 </script>
