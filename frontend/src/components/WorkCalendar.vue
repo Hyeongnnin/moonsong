@@ -35,19 +35,21 @@
     <!-- 달력 -->
     <div class="grid grid-cols-7 gap-2">
       <button
-        v-for="day in calendarDays"
-        :key="day"
-        @click="selectDate(day)"
+        v-for="dayObj in calendarDays"
+        :key="dayObj.day + '-' + Math.random()"
+        @click="selectDate(dayObj.day)"
         :class="[
           'aspect-square flex items-center justify-center text-sm rounded-lg font-medium transition-all',
-          day === 0 
+          dayObj.day === 0 
             ? 'text-gray-300 cursor-default' 
-            : day === selectedDay
+            : dayObj.day === selectedDay
             ? 'bg-brand-600 text-white shadow-md'
-            : 'text-gray-700 hover:bg-brand-50 cursor-pointer'
+            : (scheduledDayMap[dayObj.day])
+              ? 'text-white bg-red-500'
+              : 'text-gray-700 hover:bg-brand-50 cursor-pointer'
         ]"
       >
-        {{ day === 0 ? '' : day }}
+        {{ dayObj.day === 0 ? '' : dayObj.day }}
       </button>
     </div>
 
@@ -61,12 +63,16 @@
         <p class="text-xs text-gray-600 mt-1">09:00 AM - 06:00 PM (휴게 1시간)</p>
       </div>
     </div>
+
+    <WorkDayModal v-if="modalVisible" :visible="modalVisible" :employeeId="activeJob?.id" :dateIso="modalDateIso" :record="modalRecord" @close="modalVisible=false" @saved="onModalSaved" @deleted="onModalDeleted" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, watch, toRefs } from 'vue';
+import { apiClient } from '../api'
 import type { Job } from '../stores/jobStore';
+import WorkDayModal from './WorkDayModal.vue'
 
 interface Props {
   activeJob?: Job | null;
@@ -76,8 +82,14 @@ const props = withDefaults(defineProps<Props>(), {
   activeJob: null,
 });
 
+// expose activeJob to template safely
+const { activeJob } = toRefs(props)
+
 const currentDate = ref(new Date());
 const selectedDay = ref<number | null>(null);
+const modalVisible = ref(false)
+const modalRecord = ref<any | null>(null)
+const modalDateIso = ref<string>('')
 
 const currentYear = computed(() => currentDate.value.getFullYear());
 const currentMonth = computed(() => currentDate.value.getMonth() + 1);
@@ -88,20 +100,53 @@ const calendarDays = computed(() => {
   const firstDay = new Date(year, month, 1).getDay();
   const lastDate = new Date(year, month + 1, 0).getDate();
   
-  const days: number[] = [];
+  const days: { day: number, dateIso?: string, is_scheduled?: boolean, record?: any }[] = [];
   
   // 이전 달의 빈 공간
   for (let i = 0; i < firstDay; i++) {
-    days.push(0);
+    days.push({ day: 0 });
   }
   
   // 현재 달의 날짜
   for (let i = 1; i <= lastDate; i++) {
-    days.push(i);
+    days.push({ day: i });
   }
   
   return days;
 });
+
+const monthKey = computed(() => `${currentYear.value}-${String(currentMonth.value).padStart(2,'0')}`)
+const calendarData = ref<{ dates: Array<{date: string, day: number, is_scheduled: boolean, record: any}> } | null>(null)
+
+const scheduledDayMap = computed(() => {
+  const map: Record<number, {date:string, record:any} | null> = {}
+  if (!calendarData.value) return map
+  for (const d of calendarData.value.dates) {
+    map[d.day] = { date: d.date, record: d.record }
+  }
+  return map
+})
+
+async function loadCalendar() {
+  // resolve job id robustly (props.activeJob might be a value or a ref-like)
+  const job = activeJob?.value ?? (props.activeJob as any)
+  const jobId = job?.id
+  if (!jobId) return
+  try {
+    const res = await apiClient.get(`/labor/jobs/${jobId}/calendar/`, { params: { month: monthKey.value } })
+    calendarData.value = res.data
+  } catch (e) {
+    console.error('Failed to load calendar', e)
+  }
+}
+
+onMounted(() => {
+  // only load if job present
+  const job = activeJob?.value ?? (props.activeJob as any)
+  if (job && job.id) loadCalendar()
+})
+
+watch(monthKey, () => loadCalendar())
 
 const previousMonth = () => {
   currentDate.value = new Date(currentDate.value.getFullYear(), currentDate.value.getMonth() - 1);
@@ -113,11 +158,34 @@ const nextMonth = () => {
   selectedDay.value = null;
 };
 
-const selectDate = (day: number) => {
-  if (day !== 0) {
-    selectedDay.value = day;
-  }
-};
+function selectDate(day: number) {
+  // do nothing for empty cells
+  if (day === 0) return
+  const job = activeJob?.value ?? (props.activeJob as any)
+  if (!job || !job.id) return
+
+  selectedDay.value = day
+  if (!calendarData.value) return
+  const d = calendarData.value.dates.find((x: any) => x.day === day)
+  modalDateIso.value = d?.date || `${currentYear.value}-${String(currentMonth.value).padStart(2,'0')}-${String(day).padStart(2,'0')}`
+  modalRecord.value = d?.record || null
+  modalVisible.value = true
+}
+
+function onModalSaved() {
+  modalVisible.value = false
+  modalRecord.value = null
+  // reload calendar data
+  loadCalendar()
+}
+
+function onModalDeleted() {
+  modalVisible.value = false
+  modalRecord.value = null
+  loadCalendar()
+}
+
+// expose nothing
 </script>
 
 <style scoped>

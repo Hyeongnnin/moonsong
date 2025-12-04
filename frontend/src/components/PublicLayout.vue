@@ -23,12 +23,13 @@ function onNavigate(page: string) {
   else if (page === "dashboard") router.push("/dashboard");
 }
 
-function onLoggedIn(token: string) {
+function onLoggedIn(token: string, refreshToken?: string) {
   // store JWT for axios interceptor compatibility
   try {
     if (typeof window !== "undefined") {
+      // store access under 'access' key; keep refresh if provided
       window.localStorage.setItem("access", token);
-      window.localStorage.setItem("access_token", token);
+      if (refreshToken) window.localStorage.setItem("refresh", refreshToken);
     }
   } catch (e) {}
   router.push("/dashboard");

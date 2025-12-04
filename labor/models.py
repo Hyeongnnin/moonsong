@@ -103,3 +103,28 @@ class CalculationResult(models.Model):
 
     def __str__(self):
         return f"{self.employee} / {self.calculation_type} ({self.period_start}~{self.period_end})"
+
+
+WEEKDAY_CHOICES = [
+    (0, 'Monday'),
+    (1, 'Tuesday'),
+    (2, 'Wednesday'),
+    (3, 'Thursday'),
+    (4, 'Friday'),
+    (5, 'Saturday'),
+    (6, 'Sunday'),
+]
+
+class WorkSchedule(models.Model):
+    """Weekly recurring schedule for an Employee: which weekdays and times."""
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='schedules')
+    weekday = models.IntegerField(choices=WEEKDAY_CHOICES)
+    start_time = models.TimeField(null=True, blank=True)
+    end_time = models.TimeField(null=True, blank=True)
+    enabled = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = [['employee', 'weekday']]
+
+    def __str__(self):
+        return f"{self.employee} - {self.get_weekday_display()} {self.start_time}-{self.end_time}"

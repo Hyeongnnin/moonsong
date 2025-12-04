@@ -48,10 +48,12 @@
             <div
               class="h-full flex transition-transform duration-300 ease-out"
               :style="{ transform: `translateX(-${activeSection * 100}%)` }">
-              
+
               <!-- Section 0: 근로관리 (LaborDashboard) -->
               <section class="flex-shrink-0 w-full h-full overflow-y-auto">
-                <LaborDashboard />
+                <ErrorBoundary>
+                  <LaborDashboard />
+                </ErrorBoundary>
               </section>
 
               <!-- Section 1: AI상담 -->
@@ -87,6 +89,7 @@ import TopNav from './TopNav.vue'
 import LeftSidebar from './LeftSidebar.vue'
 import RightSidebar from './RightSidebar.vue'
 import { useJob } from '../stores/jobStore'
+import ErrorBoundary from './ErrorBoundary.vue'
 
 // Import section components
 const LaborDashboard = defineAsyncComponent(() => import('./DashboardContent.vue'))

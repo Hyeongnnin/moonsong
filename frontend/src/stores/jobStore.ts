@@ -114,6 +114,25 @@ export function useJob(accessToken?: string) {
   }
 
   /**
+   * 액션: 알바 생성 (서버에 POST)
+   */
+  async function createJob(payload: Partial<Job>) {
+    try {
+      const response = await apiClient.post('/labor/employees/', payload)
+      const created: Job = response.data
+      // Add to front of list
+      jobs.value.unshift(created)
+      // Set as active
+      activeJobId.value = created.id
+      try { localStorage.setItem('activeJobId', String(created.id)) } catch (e) {}
+      return created
+    } catch (err: any) {
+      console.error('Failed to create job:', err)
+      throw err
+    }
+  }
+
+  /**
    * 초기화 (앱 시작 시 호출)
    */
   async function initialize() {
@@ -138,5 +157,6 @@ export function useJob(accessToken?: string) {
     updateJob,
     deleteJob,
     initialize,
+    createJob,
   }
 }

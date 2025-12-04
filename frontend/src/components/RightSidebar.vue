@@ -4,8 +4,9 @@
       <!-- 프로필 섹션 -->
       <div class="mb-8 pb-8 border-b border-gray-200">
         <div class="flex items-center gap-4 mb-4">
-          <div class="w-12 h-12 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-bold text-lg">
-            {{ userInitial }}
+          <div class="w-12 h-12 rounded-full overflow-hidden bg-gray-100">
+            <img v-if="userAvatar" :src="userAvatar" class="w-full h-full object-cover" />
+            <div v-else class="w-full h-full flex items-center justify-center text-white font-bold text-lg bg-gradient-to-br from-brand-400 to-brand-600">{{ userInitial }}</div>
           </div>
           <div>
             <p class="font-semibold text-gray-900">{{ userName }}</p>
@@ -126,20 +127,26 @@ import { useJob, type Job } from '../stores/jobStore'
 import { useLabor, type JobSummary } from '../composables/useLabor'
 import JobSelector from './JobSelector.vue'
 import EvaluationCard from './EvaluationCard.vue'
+import { useUser } from '../stores/userStore'
 
 const router = useRouter()
 const { activeJob } = useJob()
 const { fetchJobSummary, getMonthString } = useLabor()
 
+const { user, fetchMe } = useUser()
+
 const jobSelectorRef = ref<InstanceType<typeof JobSelector> | null>(null)
 const jobSummary = ref<JobSummary | null>(null)
 const statLoading = ref(false)
 
-const userName = '김민준'
-const userRole = '알바생'
+const userName = computed(() => user.first_name || user.username || '사용자')
+const userRole = computed(() => user.role || '알바생')
+const userInitial = computed(() => (user.first_name || user.username || '사용자').charAt(0))
+const userAvatar = computed(() => user.avatar)
 
-const userInitial = computed(() => {
-  return userName.charAt(0)
+onMounted(async () => {
+  try { await fetchMe() } catch(e) { /* ignore */ }
+  loadJobSummary()
 })
 
 /**

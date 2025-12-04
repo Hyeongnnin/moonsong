@@ -13,6 +13,10 @@ from .serializers import (
     CalculationResultSerializer,
     JobSummarySerializer
 )
+from django.http import Http404
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class EmployeeViewSet(viewsets.ModelViewSet):
@@ -187,6 +191,93 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         serializer = WorkRecordSerializer(records, many=True)
         return Response(serializer.data)
 
+    @action(detail=True, methods=['get', 'post'], url_path='schedules')
+    def schedules(self, request, pk=None):
+        """GET: 리스트, POST: 추가/업데이트(weekday 단위)"""
+        job = self.get_object()
+        if request.method == 'GET':
+            schedules = job.schedules.all()
+            from .serializers import WorkScheduleSerializer
+            serializer = WorkScheduleSerializer(schedules, many=True)
+            return Response(serializer.data)
+        else:
+            # create or update per weekday
+            data = request.data
+            weekday = int(data.get('weekday'))
+            start_time = data.get('start_time')  # HH:MM
+            end_time = data.get('end_time')
+            enabled = data.get('enabled', 'true') in ['1', 'true', True, 'True']
+            schedule, created = job.schedules.get_or_create(weekday=weekday, defaults={
+                'start_time': start_time or None,
+                'end_time': end_time or None,
+                'enabled': enabled,
+            })
+            if not created:
+                schedule.start_time = start_time or None
+                schedule.end_time = end_time or None
+                schedule.enabled = enabled
+                schedule.save()
+            from .serializers import WorkScheduleSerializer
+            return Response(WorkScheduleSerializer(schedule).data)
+
+    @action(detail=True, methods=['get'], url_path='calendar')
+    def calendar(self, request, pk=None):
+        """Return month calendar highlighting scheduled weekdays and existing work_records"""
+        job = self.get_object()
+        month = request.query_params.get('month')  # YYYY-MM
+        if not month:
+            return Response({'error': 'month parameter required'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            year, mon = map(int, month.split('-'))
+        except Exception:
+            return Response({'error': 'month format error'}, status=status.HTTP_400_BAD_REQUEST)
+        import calendar as pycal
+        from datetime import date
+        _, lastday = pycal.monthrange(year, mon)
+        dates = []
+        # collect scheduled weekdays
+        schedules = job.schedules.filter(enabled=True)
+        schedule_weekdays = {s.weekday: s for s in schedules}
+        for day in range(1, lastday+1):
+            d = date(year, mon, day)
+            is_scheduled = d.weekday() in schedule_weekdays
+            record = job.work_records.filter(work_date=d).first()
+            dates.append({
+                'date': d.isoformat(),
+                'day': day,
+                'is_scheduled': is_scheduled,
+                'record': WorkRecordSerializer(record).data if record else None,
+            })
+        return Response({'dates': dates})
+
+    def destroy(self, request, pk=None):
+        """Ensure only owner can delete and return clear responses."""
+        try:
+            obj = self.get_object()
+        except Http404:
+            logger.warning('Attempt to delete non-existing Employee id=%s by user=%s', pk, request.user)
+            return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # ownership check (get_queryset already filters by user, but double-check)
+        if obj.user != request.user:
+            logger.warning('User %s attempted to delete Employee id=%s owned by %s', request.user, pk, obj.user)
+            return Response({'detail': '권한이 없습니다.'}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            # debug: log related object counts
+            work_count = obj.work_records.count()
+            schedule_count = obj.schedules.count()
+            calc_count = obj.calculation_results.count()
+            logger.info('Deleting Employee id=%s: work_records=%s, schedules=%s, calculations=%s', pk, work_count, schedule_count, calc_count)
+
+            obj.delete()
+            logger.info('Employee id=%s deleted by user=%s', pk, request.user)
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except Exception as e:
+            logger.exception('Failed to delete Employee id=%s by user=%s: %s', pk, request.user, e)
+            # return exception message to frontend for debugging (will be improved before prod)
+            return Response({'detail': f'삭제 중 오류가 발생했습니다: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class WorkRecordViewSet(viewsets.ModelViewSet):
     """근로기록 관련 API"""
@@ -205,6 +296,18 @@ class WorkRecordViewSet(viewsets.ModelViewSet):
             serializer.save()
         except Employee.DoesNotExist:
             raise PermissionError("이 Job에 접근할 권한이 없습니다.")
+
+    def perform_update(self, serializer):
+        # ensure user owns this record
+        instance = serializer.instance
+        if instance.employee.user != self.request.user:
+            raise PermissionError("이 작업을 수행할 권한이 없습니다.")
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        if instance.employee.user != self.request.user:
+            raise PermissionError("이 작업을 수행할 권한이 없습니다.")
+        instance.delete()
 
 
 class CalculationResultViewSet(viewsets.ReadOnlyModelViewSet):

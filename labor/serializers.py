@@ -2,7 +2,7 @@
 from rest_framework import serializers
 from datetime import datetime, timedelta
 from decimal import Decimal
-from .models import Employee, WorkRecord, CalculationResult
+from .models import Employee, WorkRecord, CalculationResult, WorkSchedule
 
 
 class WorkRecordSerializer(serializers.ModelSerializer):
@@ -33,8 +33,20 @@ class JobSummarySerializer(serializers.Serializer):
     week_stats = serializers.ListField()  # 주별 통계
 
 
+class WorkScheduleSerializer(serializers.ModelSerializer):
+    weekday_display = serializers.SerializerMethodField()
+
+    class Meta:
+        model = WorkSchedule
+        fields = ['id', 'weekday', 'weekday_display', 'start_time', 'end_time', 'enabled']
+
+    def get_weekday_display(self, obj):
+        return obj.get_weekday_display()
+
+
 class EmployeeSerializer(serializers.ModelSerializer):
     work_records = WorkRecordSerializer(many=True, read_only=True)
+    schedules = WorkScheduleSerializer(many=True, read_only=True)
 
     class Meta:
         model = Employee
@@ -44,7 +56,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
             'hourly_rate', 'weekly_hours', 'daily_hours',
             'has_paid_weekly_holiday', 'is_severance_eligible', 'is_current',
             'work_days_per_week', 'attendance_rate_last_year', 'total_wage_last_3m', 'total_days_last_3m',
-            'work_records'
+            'work_records', 'schedules'
         ]
         read_only_fields = ['id']
 

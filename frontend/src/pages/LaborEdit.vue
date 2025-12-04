@@ -201,6 +201,12 @@
           </div>
         </div>
 
+        <!-- 주간 스케줄 편집기 -->
+        <div class="mb-6">
+          <h2 class="text-lg font-semibold text-gray-900 mb-2">주간 근무 스케줄</h2>
+          <WeeklyScheduleEditor :employeeId="activeJob?.id || 0" />
+        </div>
+
         <!-- 에러 메시지 표시 -->
         <div v-if="submitError" class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
           <p class="text-red-700 text-sm">{{ submitError }}</p>
@@ -235,10 +241,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import { useJob } from '../stores/jobStore'
 import { useLabor } from '../composables/useLabor'
 import { apiClient } from '../api'
+import WeeklyScheduleEditor from '../components/WeeklyScheduleEditor.vue'
 
 const { activeJob, fetchJobs, setActiveJob } = useJob()
 const { fetchJobSummary, getMonthString, fetchEvaluation } = useLabor()
@@ -312,6 +319,36 @@ async function loadFormData() {
 }
 
 /**
+ * helper: convert various displayed date formats to 'YYYY-MM-DD' for API
+ */
+function pad(n: string | number) {
+  return String(n).padStart(2, '0')
+}
+function formatDateForApi(value: string | null | undefined) {
+  if (!value) return null
+  value = value.trim()
+  // If already ISO-like YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value
+  // Match patterns like '2025. 07. 27.' or '2025.07.27' or '2025. 7. 27.'
+  const m = value.match(/(\d{4}).*?(\d{1,2}).*?(\d{1,2})/)
+  if (m) {
+    const y = m[1]
+    const mo = pad(m[2])
+    const d = pad(m[3])
+    return `${y}-${mo}-${d}`
+  }
+  // As a fallback, try Date parsing and format (avoid timezone issues)
+  const dt = new Date(value)
+  if (!isNaN(dt.getTime())) {
+    const y = dt.getFullYear()
+    const mo = pad(dt.getMonth() + 1)
+    const d = pad(dt.getDate())
+    return `${y}-${mo}-${d}`
+  }
+  return null
+}
+
+/**
  * 폼 제출: PATCH 요청으로 데이터 저장
  */
 async function submitForm() {
@@ -320,10 +357,37 @@ async function submitForm() {
   isSubmitting.value = true
 
   try {
+    // Prepare payload by copying and normalizing date fields
+    const payload: any = {
+      workplace_name: formData.workplace_name,
+      workplace_address: formData.workplace_address,
+      workplace_reg_no: formData.workplace_reg_no,
+      industry: formData.industry,
+      employment_type: formData.employment_type,
+      hourly_rate: formData.hourly_rate,
+      weekly_hours: formData.weekly_hours,
+      daily_hours: formData.daily_hours,
+      has_paid_weekly_holiday: formData.has_paid_weekly_holiday,
+      is_severance_eligible: formData.is_severance_eligible,
+      is_current: formData.is_current,
+      work_days_per_week: formData.work_days_per_week,
+      attendance_rate_last_year: formData.attendance_rate_last_year,
+      total_wage_last_3m: formData.total_wage_last_3m,
+      total_days_last_3m: formData.total_days_last_3m,
+    }
+
+    // Normalize dates
+    const sd = formatDateForApi(formData.start_date)
+    const ed = formatDateForApi(formData.end_date)
+    // start_date is required
+    payload.start_date = sd
+    // end_date: if empty/null -> send null
+    payload.end_date = ed // ed will be null if empty or unparsable
+
     if (activeJob.value) {
-      await apiClient.patch(`/labor/employees/${activeJob.value.id}/`, formData)
+      await apiClient.patch(`/labor/employees/${activeJob.value.id}/`, payload)
     } else {
-      const response = await apiClient.post(`/labor/employees/`, formData)
+      const response = await apiClient.post(`/labor/employees/`, payload)
       const created = response.data
       await fetchJobs()
       if (created?.id) setActiveJob(created.id)
@@ -340,7 +404,9 @@ async function submitForm() {
 
     // 2. RightSidebar의 요약 데이터 다시 로드
     const month = getMonthString()
-    await fetchJobSummary(activeJob.value.id, month)
+    if (activeJob.value) {
+      await fetchJobSummary(activeJob.value.id, month)
+    }
 
     // 3. 평가 결과 재조회 및 카드 갱신 트리거
     try {
@@ -375,6 +441,14 @@ function cancelEdit() {
 // 컴포넌트 마운트 시 폼 데이터 로드
 onMounted(() => {
   loadFormData()
+})
+
+// Watch for changes in selected job and reload form accordingly
+watch(activeJob, (newVal, oldVal) => {
+  // Only reload when job selection actually changes
+  if ((newVal && !oldVal) || (newVal && oldVal && newVal.id !== oldVal.id) || (!newVal && oldVal)) {
+    loadFormData()
+  }
 })
 </script>
 

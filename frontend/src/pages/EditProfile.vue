@@ -23,8 +23,11 @@
             
             <div class="flex flex-col items-center gap-6">
               <!-- 현재 프로필 이미지 -->
-              <div class="w-24 h-24 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-bold text-3xl shadow-md">
-                {{ userInitial }}
+              <div class="w-24 h-24 rounded-full overflow-hidden shadow-md bg-gray-100">
+                <img v-if="profileImage" :src="profileImage" alt="Profile" class="w-full h-full object-cover" />
+                <div v-else class="w-full h-full flex items-center justify-center text-white font-bold text-3xl bg-gradient-to-br from-brand-400 to-brand-600">
+                  {{ userInitial }}
+                </div>
               </div>
 
               <!-- 이미지 업로드 버튼 -->
@@ -203,67 +206,80 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, computed } from 'vue';
+import { reactive, ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import { apiClient } from '../api';
+import { useUser } from '../stores/userStore';
+
+const { fetchMe, updateUser } = useUser();
 
 const router = useRouter();
 const fileInput = ref<HTMLInputElement | null>(null);
 const isSaving = ref(false);
 const successMessage = ref('');
 const errorMessage = ref('');
+const fieldErrors = ref<Record<string, string[]>>({});
 
 // 폼 데이터
 const formData = reactive({
-  name: '김민준',
-  email: 'mingjun@example.com',
-  phone: '010-1234-5678',
+  name: '',
+  email: '',
+  phone: '',
   currentPassword: '',
   newPassword: '',
   confirmPassword: '',
 });
 
-// 프로필 이미지 초기값
-const profileImage = ref<string | null>(null);
-
 // 사용자 초기값 계산
 const userInitial = computed(() => {
-  return formData.name.charAt(0);
+  return formData.name ? formData.name.charAt(0) : '사용자'.charAt(0)
 });
 
 // 비밀번호 일치 확인
 const passwordMismatch = computed(() => {
-  return formData.newPassword && 
-         formData.confirmPassword && 
-         formData.newPassword !== formData.confirmPassword;
+  return formData.newPassword && formData.confirmPassword && formData.newPassword !== formData.confirmPassword
 });
 
 // 폼 유효성 검사
 const isFormValid = computed(() => {
-  // 기본 정보는 항상 필수
-  if (!formData.name || !formData.email) return false;
-  
-  // 비밀번호를 입력한 경우, 새 비밀번호와 확인 비밀번호가 일치해야 함
+  if (!formData.name || !formData.email) return false
   if (formData.newPassword || formData.confirmPassword) {
-    if (!formData.currentPassword || !formData.newPassword || !formData.confirmPassword) {
-      return false;
-    }
-    if (passwordMismatch.value) {
-      return false;
-    }
+    if (!formData.currentPassword || !formData.newPassword || !formData.confirmPassword) return false
+    if (passwordMismatch.value) return false
   }
-  
-  return true;
+  return true
 });
+
+// 프로필 이미지 초기값
+const profileImage = ref<string | null>(null);
+const selectedFile = ref<File | null>(null);
+const avatarCleared = ref(false);
+
+onMounted(async () => {
+  try {
+    const res = await apiClient.get('/accounts/profile/me/')
+    const data = res.data
+    formData.name = data.first_name || data.username || ''
+    formData.email = data.email || ''
+    formData.phone = data.phone_number || ''
+    profileImage.value = data.avatar || null
+    // update user store
+    await fetchMe()
+  } catch (err) {
+    console.error('profile fetch error', err)
+  }
+})
 
 // 파일 입력 트리거
 function triggerFileInput() {
   fileInput.value?.click();
 }
 
-// 이미지 업로드 처리
+// 이미지 업로드 처리 (로컬 프리뷰 설정)
 function handleImageUpload(event: Event) {
   const target = event.target as HTMLInputElement;
   const file = target.files?.[0];
+  avatarCleared.value = false;
   
   if (file) {
     // 파일 크기 체크 (5MB)
@@ -277,33 +293,31 @@ function handleImageUpload(event: Event) {
       errorMessage.value = 'JPG, PNG, GIF 형식의 파일만 가능합니다.';
       return;
     }
-    
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      profileImage.value = e.target?.result as string;
-    };
-    reader.readAsDataURL(file);
+    selectedFile.value = file;
+    const url = URL.createObjectURL(file)
+    profileImage.value = url;
   }
 }
 
 // 이미지 제거
 function removeImage() {
   profileImage.value = null;
+  selectedFile.value = null;
+  avatarCleared.value = true;
   if (fileInput.value) {
     fileInput.value.value = '';
   }
 }
 
 // 비밀번호 일치 검증
-function validatePasswordMatch() {
-  // 컴포넌트가 반응형으로 업데이트됨
-}
+function validatePasswordMatch() {}
 
 // 폼 제출
 async function handleSubmit() {
-  if (!isFormValid.value) {
-    errorMessage.value = '모든 필수 항목을 올바르게 입력하세요.';
-    return;
+  fieldErrors.value = {};
+  if (!formData.name || !formData.email) {
+    errorMessage.value = '이름과 이메일은 필수입니다.'
+    return
   }
 
   isSaving.value = true;
@@ -311,36 +325,52 @@ async function handleSubmit() {
   successMessage.value = '';
 
   try {
-    // 실제 API 호출을 여기에 추가하세요
-    // const response = await fetch('/api/users/profile', {
-    //   method: 'PUT',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({
-    //     name: formData.name,
-    //     email: formData.email,
-    //     phone: formData.phone,
-    //     ...(formData.newPassword && {
-    //       current_password: formData.currentPassword,
-    //       new_password: formData.newPassword,
-    //     }),
-    //     ...(profileImage.value && {
-    //       profile_image: profileImage.value,
-    //     }),
-    //   }),
-    // });
+    // 프로필 업데이트 (multipart multipart)
+    const fd = new FormData()
+    fd.append('first_name', formData.name)
+    fd.append('email', formData.email)
+    fd.append('phone_number', formData.phone)
+    if (selectedFile.value) {
+      fd.append('avatar', selectedFile.value)
+    }
+    if (avatarCleared.value) {
+      fd.append('avatar_clear', '1')
+    }
 
-    // 시뮬레이션: 2초 대기
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    const res = await apiClient.patch('/accounts/profile/me/', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
 
-    successMessage.value = '프로필이 성공적으로 수정되었습니다!';
-    
-    // 2초 후 대시보드로 이동
-    setTimeout(() => {
-      router.push('/dashboard');
-    }, 2000);
-  } catch (error) {
-    errorMessage.value = '프로필 수정에 실패했습니다. 다시 시도해주세요.';
-    console.error('프로필 수정 오류:', error);
+    // 비밀번호 변경 필요 시
+    if (formData.currentPassword || formData.newPassword || formData.confirmPassword) {
+      const pwdRes = await apiClient.post('/accounts/profile/change-password/', {
+        current_password: formData.currentPassword,
+        new_password: formData.newPassword,
+        new_password_confirm: formData.confirmPassword,
+      })
+      // 성공 시 입력 필드 초기화
+      formData.currentPassword = ''
+      formData.newPassword = ''
+      formData.confirmPassword = ''
+    }
+
+    // 성공 처리
+    successMessage.value = '프로필이 저장되었습니다.'
+
+    // 유저 스토어 갱신
+    await fetchMe()
+
+    // 프로필 카드 즉시 반영을 위해 updateUser 호출도 가능
+    // updateUser({ first_name: formData.name, avatar: res.data.avatar })
+
+  } catch (err: any) {
+    console.error('save error', err)
+    if (err.response?.data) {
+      const data = err.response.data
+      // serializer errors
+      fieldErrors.value = data
+      errorMessage.value = data.detail || '저장에 실패했습니다.'
+    } else {
+      errorMessage.value = '저장 중 오류가 발생했습니다.'
+    }
   } finally {
     isSaving.value = false;
   }
