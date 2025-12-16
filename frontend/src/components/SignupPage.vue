@@ -5,27 +5,8 @@
         <div>
           <h2 class="text-2xl font-semibold text-gray-900 mb-2">회원가입</h2>
           <p class="text-sm text-gray-500">
-            아래에서 회원 유형을 선택한 뒤, 기본 정보를 입력해주세요.
+            아래 기본 정보를 입력해주세요.
           </p>
-        </div>
-
-        <div class="flex rounded-full border border-gray-200 bg-gray-50 p-1 text-sm">
-          <button
-            type="button"
-            class="flex-1 py-2 rounded-full transition-colors"
-            :class="userType === 'individual' ? 'bg-white text-brand-600 shadow-sm' : 'text-gray-500'"
-            @click="userType = 'individual'"
-          >
-            개인회원
-          </button>
-          <button
-            type="button"
-            class="flex-1 py-2 rounded-full transition-colors"
-            :class="userType === 'expert' ? 'bg-white text-brand-600 shadow-sm' : 'text-gray-500'"
-            @click="userType = 'expert'"
-          >
-            전문가 회원
-          </button>
         </div>
 
         <form @submit.prevent="handleSignup" class="space-y-4">
@@ -47,6 +28,27 @@
             />
             <p v-if="fieldErrors.username" class="mt-1 text-sm text-red-600">
               {{ fieldErrors.username.join(' ') }}
+            </p>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">닉네임</label>
+            <input
+              v-model="nickname"
+              data-field="nickname"
+              type="text"
+              required
+              :class="[
+                'w-full px-3 py-2 rounded-lg text-sm focus:outline-none',
+                fieldErrors.nickname
+                  ? 'border-red-600 ring-2 ring-red-100 outline-none'
+                  : 'border border-gray-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500',
+              ]"
+              @input="clearError('nickname')"
+              placeholder=""
+            />
+            <p v-if="fieldErrors.nickname" class="mt-1 text-sm text-red-600">
+              {{ fieldErrors.nickname.join(' ') }}
             </p>
           </div>
 
@@ -128,10 +130,8 @@ const emit = defineEmits<{
   (e: "navigate", page: "landing" | "login" | "signup" | "dashboard"): void;
 }>();
 
-type UserType = "individual" | "expert";
-
-const userType = ref<UserType>("individual");
 const username = ref("");
+const nickname = ref("");
 const email = ref("");
 const password = ref("");
 const loading = ref(false);
@@ -159,7 +159,7 @@ async function handleSignup() {
   clearFieldErrors();
 
   try {
-    await signup(username.value, email.value, password.value);
+    await signup(username.value, nickname.value, email.value, password.value);
     messageType.value = "success";
     message.value = "가입이 완료되었습니다. 이제 로그인할 수 있어요.";
   } catch (error: any) {

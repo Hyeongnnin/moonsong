@@ -89,9 +89,10 @@ export async function login(username: string, password: string): Promise<LoginRe
   return response.data;
 }
 
-export async function signup(username: string, email: string, password: string) {
+export async function signup(username: string, nickname: string, email: string, password: string) {
   const response = await apiClient.post("/accounts/signup/", {
     username,
+    nickname,
     email,
     password,
   });
@@ -105,4 +106,112 @@ export async function fetchMe(accessToken: string): Promise<UserMe> {
     },
   });
   return response.data;
+}
+
+// Documents API helpers
+export interface DocumentTemplate {
+  id: number;
+  name: string;
+  doc_type: string;
+  description?: string;
+  required_fields_json?: any;
+  file_path?: string;
+  is_active?: boolean;
+}
+
+export interface GeneratedDocument {
+  id: number;
+  template: number | DocumentTemplate | null;
+  doc_type?: string | null;  // ✅ B 프로젝트 병합: 템플릿 없이도 서류 유형 지정 가능
+  title?: string | null;
+  user: number;
+  employee?: number | null;
+  consultation?: number | null;
+  filled_data_json?: any;
+  file_url?: string | null;
+  status?: string;
+  created_at?: string;
+}
+
+export async function fetchTemplates(): Promise<DocumentTemplate[]> {
+  const res = await apiClient.get<DocumentTemplate[]>("/documents/templates/");
+  return res.data;
+}
+
+export async function fetchGenerated(): Promise<GeneratedDocument[]> {
+  const res = await apiClient.get<GeneratedDocument[]>("/documents/generated/");
+  return res.data;
+}
+
+export async function createGenerated(payload: FormData): Promise<GeneratedDocument> {
+  const res = await apiClient.post<GeneratedDocument>("/documents/generated/", payload, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return res.data;
+}
+
+export async function deleteGenerated(id: number): Promise<void> {
+  await apiClient.delete(`/documents/generated/${id}/`);
+}
+
+export async function updateGenerated(id: number, payload: FormData): Promise<GeneratedDocument> {
+  const res = await apiClient.patch<GeneratedDocument>(`/documents/generated/${id}/`, payload, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return res.data;
+}
+
+
+// ===================================================================
+// ✅ B 프로젝트 병합: 이력서 자동 생성 API
+// ===================================================================
+
+export interface ResumeExperience {
+  company?: string;
+  role?: string;
+  period?: string;
+  achievements?: string[];
+  description?: string;
+}
+
+export interface ResumeEducation {
+  school?: string;
+  major?: string;
+  period?: string;
+  description?: string;
+}
+
+export interface ResumePayload {
+  name: string;
+  title?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  summary?: string;
+  experiences?: ResumeExperience[];
+  educations?: ResumeEducation[];
+  skills?: string[];
+  certifications?: string[];
+  languages?: string[];
+  save_to_documents?: boolean;
+  document_title?: string;
+  status?: string;
+}
+
+export async function generateResumeDocx(payload: ResumePayload): Promise<{ 
+  blob: Blob; 
+  filename: string; 
+  saved: boolean; 
+  url?: string 
+}> {
+  const res = await apiClient.post(`/documents/resume/generate/`, payload, {
+    responseType: 'blob',
+  });
+
+  const disposition = res.headers['content-disposition'] || '';
+  const match = disposition.match(/filename="?([^";]+)"?/);
+  const filename = match ? decodeURIComponent(match[1]) : 'resume.docx';
+  const saved = res.headers['x-document-saved'] === 'true';
+  const url = res.headers['x-document-url'];
+  return { blob: res.data as Blob, filename, saved, url };
 }

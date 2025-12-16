@@ -1,0 +1,1 @@
+import{_ as t}from"./userStore-CmHVLOsv.js";import{c as s,h as r,b as o}from"./index-Cnd5pVle.js";import"./api-DXNNeTpL.js";const n={};function c(a,e){return r(),s("section",null,[...e[0]||(e[0]=[o("h2",{class:"text-2xl font-semibold mb-4"},"근로서류",-1),o("div",{class:"p-4 bg-white rounded shadow"},"서류 리스트 및 업로드 (플레이스홀더)",-1)])])}const i=t(n,[["render",c]]);export{i as default};

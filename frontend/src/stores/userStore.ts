@@ -4,6 +4,7 @@ import { apiClient } from '../api'
 const state = reactive({
   id: null as number | null,
   username: '',
+  nickname: '',
   first_name: '',
   last_name: '',
   email: '',
@@ -24,6 +25,7 @@ export function useUser() {
       setUser({
         id: data.id || null,
         username: data.username || '',
+        nickname: data.nickname || '',
         first_name: data.first_name || '',
         last_name: data.last_name || '',
         email: data.email || '',

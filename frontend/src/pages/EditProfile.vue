@@ -66,17 +66,31 @@
             <h2 class="text-lg font-semibold text-gray-900 mb-6">기본 정보</h2>
             
             <div class="space-y-5">
-              <!-- 이름 -->
+              <!-- 아이디 (읽기 전용) -->
               <div>
-                <label for="name" class="block text-sm font-medium text-gray-900 mb-2">
-                  이름 <span class="text-red-500">*</span>
+                <label for="username" class="block text-sm font-medium text-gray-900 mb-2">
+                  아이디
                 </label>
                 <input
-                  id="name"
-                  v-model="formData.name"
+                  id="username"
+                  v-model="formData.username"
+                  type="text"
+                  readonly
+                  class="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-gray-50 text-gray-500 cursor-not-allowed"
+                  placeholder="username">
+              </div>
+
+              <!-- 닉네임 -->
+              <div>
+                <label for="nickname" class="block text-sm font-medium text-gray-900 mb-2">
+                  닉네임 <span class="text-red-500">*</span>
+                </label>
+                <input
+                  id="nickname"
+                  v-model="formData.nickname"
                   type="text"
                   class="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all duration-200"
-                  placeholder="홀길동"
+                  placeholder="화면에 표시될 닉네임"
                   required>
               </div>
 
@@ -191,16 +205,6 @@
           </div>
         </form>
       </div>
-
-      <!-- 성공 메시지 -->
-      <div v-if="successMessage" class="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
-        {{ successMessage }}
-      </div>
-
-      <!-- 오류 메시지 -->
-      <div v-if="errorMessage" class="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-        {{ errorMessage }}
-      </div>
     </div>
   </div>
 </template>
@@ -222,7 +226,8 @@ const fieldErrors = ref<Record<string, string[]>>({});
 
 // 폼 데이터
 const formData = reactive({
-  name: '',
+  username: '',
+  nickname: '',
   email: '',
   phone: '',
   currentPassword: '',
@@ -232,7 +237,7 @@ const formData = reactive({
 
 // 사용자 초기값 계산
 const userInitial = computed(() => {
-  return formData.name ? formData.name.charAt(0) : '사용자'.charAt(0)
+  return formData.nickname ? formData.nickname.charAt(0) : '사용자'.charAt(0)
 });
 
 // 비밀번호 일치 확인
@@ -242,7 +247,7 @@ const passwordMismatch = computed(() => {
 
 // 폼 유효성 검사
 const isFormValid = computed(() => {
-  if (!formData.name || !formData.email) return false
+  if (!formData.nickname || !formData.email) return false
   if (formData.newPassword || formData.confirmPassword) {
     if (!formData.currentPassword || !formData.newPassword || !formData.confirmPassword) return false
     if (passwordMismatch.value) return false
@@ -259,7 +264,8 @@ onMounted(async () => {
   try {
     const res = await apiClient.get('/accounts/profile/me/')
     const data = res.data
-    formData.name = data.first_name || data.username || ''
+    formData.username = data.username || ''
+    formData.nickname = data.nickname || ''
     formData.email = data.email || ''
     formData.phone = data.phone_number || ''
     profileImage.value = data.avatar || null
@@ -315,8 +321,8 @@ function validatePasswordMatch() {}
 // 폼 제출
 async function handleSubmit() {
   fieldErrors.value = {};
-  if (!formData.name || !formData.email) {
-    errorMessage.value = '이름과 이메일은 필수입니다.'
+  if (!formData.nickname || !formData.email) {
+    errorMessage.value = '닉네임과 이메일은 필수입니다.'
     return
   }
 
@@ -327,7 +333,7 @@ async function handleSubmit() {
   try {
     // 프로필 업데이트 (multipart multipart)
     const fd = new FormData()
-    fd.append('first_name', formData.name)
+    fd.append('nickname', formData.nickname)
     fd.append('email', formData.email)
     fd.append('phone_number', formData.phone)
     if (selectedFile.value) {
@@ -352,14 +358,14 @@ async function handleSubmit() {
       formData.confirmPassword = ''
     }
 
-    // 성공 처리
-    successMessage.value = '프로필이 저장되었습니다.'
-
+    // 성공 처리 - 알림창 표시 후 메인 페이지로 이동
+    alert('프로필이 저장되었습니다.')
+    
     // 유저 스토어 갱신
     await fetchMe()
-
-    // 프로필 카드 즉시 반영을 위해 updateUser 호출도 가능
-    // updateUser({ first_name: formData.name, avatar: res.data.avatar })
+    
+    // 메인 페이지(대시보드)로 이동
+    router.push('/dashboard')
 
   } catch (err: any) {
     console.error('save error', err)

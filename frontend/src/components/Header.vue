@@ -40,7 +40,7 @@
 
 <script setup lang="ts">
 defineProps<{
-  currentPage: "landing" | "login" | "signup" | "dashboard";
+  currentPage?: "landing" | "login" | "signup" | "dashboard";
 }>();
 
 defineEmits<{

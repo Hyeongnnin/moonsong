@@ -2,7 +2,7 @@
 from rest_framework import serializers
 from datetime import datetime, timedelta
 from decimal import Decimal
-from .models import Employee, WorkRecord, CalculationResult, WorkSchedule
+from .models import Employee, WorkRecord, CalculationResult, WorkSchedule, MonthlySchedule
 
 
 class WorkRecordSerializer(serializers.ModelSerializer):
@@ -11,7 +11,7 @@ class WorkRecordSerializer(serializers.ModelSerializer):
     class Meta:
         model = WorkRecord
         fields = [
-            'id', 'work_date', 'time_in', 'time_out', 'break_minutes',
+            'id', 'employee', 'work_date', 'time_in', 'time_out', 'break_minutes',
             'total_hours', 'is_overtime', 'is_night', 'is_holiday'
         ]
 
@@ -44,6 +44,17 @@ class WorkScheduleSerializer(serializers.ModelSerializer):
         return obj.get_weekday_display()
 
 
+class MonthlyScheduleSerializer(serializers.ModelSerializer):
+    weekday_display = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MonthlySchedule
+        fields = ['id', 'year', 'month', 'weekday', 'weekday_display', 'start_time', 'end_time', 'enabled']
+
+    def get_weekday_display(self, obj):
+        return obj.get_weekday_display()
+
+
 class EmployeeSerializer(serializers.ModelSerializer):
     work_records = WorkRecordSerializer(many=True, read_only=True)
     schedules = WorkScheduleSerializer(many=True, read_only=True)
@@ -53,9 +64,8 @@ class EmployeeSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'workplace_name', 'workplace_address', 'workplace_reg_no',
             'industry', 'employment_type', 'start_date', 'end_date',
-            'hourly_rate', 'weekly_hours', 'daily_hours',
-            'has_paid_weekly_holiday', 'is_severance_eligible', 'is_current',
-            'work_days_per_week', 'attendance_rate_last_year', 'total_wage_last_3m', 'total_days_last_3m',
+            'hourly_rate',
+            'attendance_rate_last_year', 'total_wage_last_3m', 'total_days_last_3m',
             'work_records', 'schedules'
         ]
         read_only_fields = ['id']
@@ -69,21 +79,14 @@ class EmployeeUpdateSerializer(serializers.ModelSerializer):
         fields = [
             'workplace_name', 'workplace_address', 'workplace_reg_no',
             'industry', 'employment_type', 'start_date', 'end_date',
-            'hourly_rate', 'weekly_hours', 'daily_hours',
-            'has_paid_weekly_holiday', 'is_severance_eligible', 'is_current',
-            'work_days_per_week', 'attendance_rate_last_year', 'total_wage_last_3m', 'total_days_last_3m'
+            'hourly_rate',
+            'attendance_rate_last_year', 'total_wage_last_3m', 'total_days_last_3m'
         ]
 
     def validate_hourly_rate(self, value):
         """시급은 0 이상이어야 함"""
         if value < 0:
             raise serializers.ValidationError("시급은 0 이상이어야 합니다.")
-        return value
-
-    def validate_weekly_hours(self, value):
-        """주당 근로시간은 0 이상 168 이하여야 함"""
-        if value < 0 or value > 168:
-            raise serializers.ValidationError("주당 근로시간은 0 이상 168 이하여야 합니다.")
         return value
 
     def validate(self, data):

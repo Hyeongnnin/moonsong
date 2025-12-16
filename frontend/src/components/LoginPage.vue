@@ -7,25 +7,6 @@
           가입하신 아이디와 비밀번호를 입력해주세요.
         </p>
 
-        <div class="flex mb-6 rounded-full border border-gray-200 bg-gray-50 p-1 text-sm">
-          <button
-            type="button"
-            class="flex-1 py-2 rounded-full transition-colors"
-            :class="userType === 'individual' ? 'bg-white text-brand-600 shadow-sm' : 'text-gray-500'"
-            @click="userType = 'individual'"
-          >
-            개인회원
-          </button>
-          <button
-            type="button"
-            class="flex-1 py-2 rounded-full transition-colors"
-            :class="userType === 'expert' ? 'bg-white text-brand-600 shadow-sm' : 'text-gray-500'"
-            @click="userType = 'expert'"
-          >
-            전문가 회원
-          </button>
-        </div>
-
         <form @submit.prevent="handleLogin" class="space-y-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">아이디</label>
@@ -103,9 +84,6 @@ const emit = defineEmits<{
   (e: "logged-in", token: string): void;
 }>();
 
-type UserType = "individual" | "expert";
-
-const userType = ref<UserType>("individual");
 const username = ref("");
 const password = ref("");
 const rememberId = ref(false);

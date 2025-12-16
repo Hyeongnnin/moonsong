@@ -1,0 +1,10 @@
+{
+    "version": "2025-01-01",
+    "description": "Standard Korean Labor Standards Act (2025)",
+    "rules": {
+        "min_weekly_hours": 15,
+        "require_perfect_attendance": true,
+        "calculation_method": "daily_average",
+        "description_ko": "주 15시간 이상 근무 및 소정근로일 개근 시 발생"
+    }
+}

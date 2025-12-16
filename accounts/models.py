@@ -18,6 +18,9 @@ class User(AbstractUser):
     )
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="active")
 
+    # 닉네임 (화면에 표시되는 이름)
+    nickname = models.CharField(max_length=50, null=True, blank=True)
+
     # 프로필 이미지: media/profile_images/ 아래에 저장
     profile_image = models.ImageField(upload_to=_profile_image_upload_to, null=True, blank=True)
 
@@ -28,4 +31,4 @@ class User(AbstractUser):
     # PasswordHash는 Django가 password 필드 + 해시로 관리
 
     def __str__(self):
-        return self.username
+        return self.nickname or self.username

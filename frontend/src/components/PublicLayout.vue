@@ -1,6 +1,6 @@
 <template>
   <div>
-    <Header @navigate="onNavigate" />
+    <Header current-page="landing" @navigate="onNavigate" />
     <main class="pt-16">
       <router-view v-slot="{ Component }">
         <component :is="Component" @navigate="onNavigate" @logged-in="onLoggedIn" />

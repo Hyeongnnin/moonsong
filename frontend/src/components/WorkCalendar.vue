@@ -6,15 +6,44 @@
         <p class="text-sm text-gray-500 mt-1">근로시간 기록</p>
       </div>
       <div class="flex gap-2">
+        <!-- 월별 스케줄 변경 버튼 -->
+        <button 
+          v-if="activeJob"
+          @click="openMonthlyScheduleModal"
+          :disabled="isFutureMonth"
+          :class="[
+            'px-3 py-2 text-sm font-medium rounded-lg transition-colors',
+            isFutureMonth
+              ? 'text-gray-400 bg-gray-100 cursor-not-allowed opacity-50'
+              : 'text-brand-600 bg-brand-50 hover:bg-brand-100'
+          ]"
+          :title="isFutureMonth ? '미래 월의 스케줄은 변경할 수 없습니다' : '이 달의 근무 스케줄을 변경합니다'"
+        >
+          📅 월별 스케줄 변경
+        </button>
         <button 
           @click="previousMonth"
-          class="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+          :disabled="!canGoPrevious"
+          :class="[
+            'p-2 rounded-lg transition-colors',
+            canGoPrevious 
+              ? 'text-gray-600 hover:bg-gray-100 cursor-pointer' 
+              : 'text-gray-300 cursor-not-allowed opacity-50'
+          ]"
+          :title="!canGoPrevious ? '근로 시작일 이전 달은 볼 수 없습니다' : '이전 달'"
         >
           ◀
         </button>
         <button 
           @click="nextMonth"
-          class="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+          :disabled="!canGoNext"
+          :class="[
+            'p-2 rounded-lg transition-colors',
+            canGoNext 
+              ? 'text-gray-600 hover:bg-gray-100 cursor-pointer' 
+              : 'text-gray-300 cursor-not-allowed opacity-50'
+          ]"
+          :title="!canGoNext ? '현재 월로부터 6개월 이후는 볼 수 없습니다' : '다음 달'"
         >
           ▶
         </button>
@@ -22,7 +51,7 @@
     </div>
 
     <!-- 요일 헤더 -->
-    <div class="grid grid-cols-7 gap-2 mb-4">
+    <div class="grid grid-cols-7 gap-2 mb-3">
       <div 
         v-for="day in ['일', '월', '화', '수', '목', '금', '토']" 
         :key="day" 
@@ -32,47 +61,58 @@
       </div>
     </div>
 
-    <!-- 달력 -->
+    <!-- 달력 (콘텐츠 기반 높이) -->
     <div class="grid grid-cols-7 gap-2">
       <button
         v-for="dayObj in calendarDays"
-        :key="dayObj.day + '-' + Math.random()"
+        :key="dayObj.dateIso || Math.random()"
         @click="selectDate(dayObj.day)"
+        :style="dayObj.day !== 0 && selectedDay !== dayObj.day && isDateScheduled(dayObj.dateIso) ? 'background-color: #f97316 !important; color: white !important;' : ''"
         :class="[
           'aspect-square flex items-center justify-center text-sm rounded-lg font-medium transition-all',
-          dayObj.day === 0 
-            ? 'text-gray-300 cursor-default' 
-            : dayObj.day === selectedDay
-            ? 'bg-brand-600 text-white shadow-md'
-            : (scheduledDayMap[dayObj.day])
-              ? 'text-white bg-red-500'
-              : 'text-gray-700 hover:bg-brand-50 cursor-pointer'
+          {
+            'text-transparent cursor-default': dayObj.day === 0,
+            'bg-brand-600 text-white shadow-md': dayObj.day !== 0 && selectedDay === dayObj.day,
+            'scheduled-day': dayObj.day !== 0 && selectedDay !== dayObj.day && isDateScheduled(dayObj.dateIso),
+            'text-gray-900 hover:bg-brand-50 bg-white border border-gray-200': dayObj.day !== 0 && selectedDay !== dayObj.day && !isDateScheduled(dayObj.dateIso) && !isFutureMonth,
+            'text-gray-400 bg-gray-100 cursor-not-allowed border border-gray-300': dayObj.day !== 0 && isFutureMonth
+          }
         ]"
+        :disabled="dayObj.day === 0 || isFutureMonth"
+        :title="dayObj.dateIso ? (isFutureMonth ? '미래 월에는 근로 기록을 입력할 수 없습니다' : `${dayObj.dateIso}: ${isDateScheduled(dayObj.dateIso) ? 'Scheduled' : 'Not scheduled'}`) : ''"
       >
-        {{ dayObj.day === 0 ? '' : dayObj.day }}
+        {{ dayObj.day || '' }}
       </button>
     </div>
 
-    <!-- 선택된 날짜의 근로시간 -->
-    <div v-if="selectedDay" class="mt-6 pt-6 border-t border-gray-200">
-      <p class="text-sm font-medium text-gray-900 mb-3">
-        {{ currentYear }}년 {{ currentMonth }}월 {{ selectedDay }}일 근로시간
-      </p>
-      <div class="bg-brand-50 rounded-lg p-4 border border-brand-100">
-        <p class="text-2xl font-bold text-brand-600">8시간</p>
-        <p class="text-xs text-gray-600 mt-1">09:00 AM - 06:00 PM (휴게 1시간)</p>
-      </div>
-    </div>
-
-    <WorkDayModal v-if="modalVisible" :visible="modalVisible" :employeeId="activeJob?.id" :dateIso="modalDateIso" :record="modalRecord" @close="modalVisible=false" @saved="onModalSaved" @deleted="onModalDeleted" />
+    <WorkDayModal 
+      v-if="modalVisible" 
+      :visible="modalVisible" 
+      :employeeId="activeJob?.id" 
+      :dateIso="modalDateIso" 
+      :record="modalRecord" 
+      @close="onModalClose" 
+      @saved="onModalSaved" 
+      @deleted="onModalDeleted" 
+    />
+    
+    <MonthlyScheduleModal
+      :isOpen="monthlyScheduleModalOpen"
+      :employeeId="activeJob?.id || null"
+      :year="currentYear"
+      :month="currentMonth"
+      @close="closeMonthlyScheduleModal"
+      @saved="onMonthlyScheduleSaved"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, toRefs } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, toRefs } from 'vue';
 import { apiClient } from '../api'
 import type { Job } from '../stores/jobStore';
 import WorkDayModal from './WorkDayModal.vue'
+import MonthlyScheduleModal from './MonthlyScheduleModal.vue'
 
 interface Props {
   activeJob?: Job | null;
@@ -82,7 +122,8 @@ const props = withDefaults(defineProps<Props>(), {
   activeJob: null,
 });
 
-// expose activeJob to template safely
+const emit = defineEmits(['statsUpdated', 'monthChanged']);
+
 const { activeJob } = toRefs(props)
 
 const currentDate = ref(new Date());
@@ -91,102 +132,291 @@ const modalVisible = ref(false)
 const modalRecord = ref<any | null>(null)
 const modalDateIso = ref<string>('')
 
+// 월별 스케줄 모달 상태
+const monthlyScheduleModalOpen = ref(false)
+
 const currentYear = computed(() => currentDate.value.getFullYear());
 const currentMonth = computed(() => currentDate.value.getMonth() + 1);
 
-const calendarDays = computed(() => {
-  const year = currentDate.value.getFullYear();
-  const month = currentDate.value.getMonth();
-  const firstDay = new Date(year, month, 1).getDay();
-  const lastDate = new Date(year, month + 1, 0).getDate();
+// 근로 시작일 기준으로 이전 달로 이동 가능 여부 확인
+const canGoPrevious = computed(() => {
+  if (!activeJob?.value?.start_date) return true; // start_date가 없으면 제한 없음
   
-  const days: { day: number, dateIso?: string, is_scheduled?: boolean, record?: any }[] = [];
+  const startDate = new Date(activeJob.value.start_date);
+  const startYear = startDate.getFullYear();
+  const startMonth = startDate.getMonth() + 1; // 1-12
+  
+  // 현재 보고 있는 달이 시작일의 달보다 이후면 true
+  if (currentYear.value > startYear) return true;
+  if (currentYear.value === startYear && currentMonth.value > startMonth) return true;
+  
+  return false;
+});
+
+// 미래 월 이동 제한: 현재 월 + 6개월까지만 허용
+const canGoNext = computed(() => {
+  const today = new Date();
+  const todayYear = today.getFullYear();
+  const todayMonth = today.getMonth() + 1; // 1-12
+  
+  // 현재 월 + 6개월 계산
+  const maxDate = new Date(todayYear, todayMonth - 1 + 6, 1); // month는 0-based
+  const maxYear = maxDate.getFullYear();
+  const maxMonth = maxDate.getMonth() + 1;
+  
+  // 현재 보고 있는 달이 최대 허용 월보다 이전이면 true
+  if (currentYear.value < maxYear) return true;
+  if (currentYear.value === maxYear && currentMonth.value < maxMonth) return true;
+  
+  return false;
+});
+
+// 미래 월 여부 확인 (현재 월보다 이후인지)
+const isFutureMonth = computed(() => {
+  const today = new Date();
+  const todayYear = today.getFullYear();
+  const todayMonth = today.getMonth() + 1; // 1-12
+  
+  if (currentYear.value > todayYear) return true;
+  if (currentYear.value === todayYear && currentMonth.value > todayMonth) return true;
+  
+  return false;
+});
+
+const calendarDays = computed(() => {
+  const year = currentYear.value;
+  const month = currentMonth.value - 1; // getMonth() is 0-indexed
+  const firstDayOfMonth = new Date(year, month, 1).getDay();
+  const lastDateOfMonth = new Date(year, month + 1, 0).getDate();
+  
+  const days: { day: number, dateIso?: string }[] = [];
   
   // 이전 달의 빈 공간
-  for (let i = 0; i < firstDay; i++) {
+  for (let i = 0; i < firstDayOfMonth; i++) {
     days.push({ day: 0 });
   }
   
   // 현재 달의 날짜
-  for (let i = 1; i <= lastDate; i++) {
-    days.push({ day: i });
+  for (let i = 1; i <= lastDateOfMonth; i++) {
+    // 로컬 날짜 문자열 생성 (UTC 변환 없이)
+    const dateIso = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+    days.push({ day: i, dateIso });
   }
   
   return days;
 });
 
-const monthKey = computed(() => `${currentYear.value}-${String(currentMonth.value).padStart(2,'0')}`)
-const calendarData = ref<{ dates: Array<{date: string, day: number, is_scheduled: boolean, record: any}> } | null>(null)
+const calendarData = ref<Array<{date: string, is_scheduled: boolean}>>([]);
 
 const scheduledDayMap = computed(() => {
-  const map: Record<number, {date:string, record:any} | null> = {}
-  if (!calendarData.value) return map
-  for (const d of calendarData.value.dates) {
-    map[d.day] = { date: d.date, record: d.record }
+  const map: Record<string, { is_scheduled: boolean }> = {};
+  if (!calendarData.value || !Array.isArray(calendarData.value)) {
+    return map;
   }
-  return map
-})
+  
+  for (const d of calendarData.value) {
+    if (d && d.date) {
+      map[d.date] = { is_scheduled: !!d.is_scheduled };
+    }
+  }
+  
+  return map;
+});
+
+// 날짜가 스케줄되어 있는지 확인하는 헬퍼 함수
+const isDateScheduled = (dateIso?: string): boolean => {
+  if (!dateIso) return false;
+  
+  // 실제 데이터만 확인 (폴백 로직 제거)
+  const mapEntry = scheduledDayMap.value[dateIso];
+  const result = mapEntry?.is_scheduled === true;
+  
+  return result;
+};
 
 async function loadCalendar() {
-  // resolve job id robustly (props.activeJob might be a value or a ref-like)
-  const job = activeJob?.value ?? (props.activeJob as any)
-  const jobId = job?.id
-  if (!jobId) return
+  const employeeId = activeJob?.value?.id;
+  if (!employeeId) {
+    calendarData.value = [];
+    return;
+  }
+
   try {
-    const res = await apiClient.get(`/labor/jobs/${jobId}/calendar/`, { params: { month: monthKey.value } })
-    calendarData.value = res.data
+    const monthStr = `${currentYear.value}-${String(currentMonth.value).padStart(2, '0')}`;
+    const res = await apiClient.get(`/labor/jobs/${employeeId}/monthly-schedule/`, {
+      params: {
+        month: monthStr,
+      },
+    });
+    
+    // 응답 데이터 구조 확인 및 할당
+    const responseData = res.data.dates || res.data;
+    calendarData.value = Array.isArray(responseData) ? responseData : [];
+    
+    // 강제로 다음 틱에서 재렌더링 트리거
+    await new Promise(resolve => setTimeout(resolve, 0));
   } catch (e) {
-    console.error('Failed to load calendar', e)
+    console.error('[WorkCalendar] Failed to load calendar schedule', e);
+    calendarData.value = [];
   }
 }
 
-onMounted(() => {
-  // only load if job present
-  const job = activeJob?.value ?? (props.activeJob as any)
-  if (job && job.id) loadCalendar()
-})
-
-watch(monthKey, () => loadCalendar())
+watch([() => activeJob?.value?.id, currentYear, currentMonth], () => {
+  loadCalendar();
+  // 월이 변경될 때마다 통계 카드에 알림
+  emit('monthChanged', { year: currentYear.value, month: currentMonth.value });
+}, { immediate: true });
 
 const previousMonth = () => {
+  if (!canGoPrevious.value) return; // 근로 시작일 이전으로는 이동 불가
   currentDate.value = new Date(currentDate.value.getFullYear(), currentDate.value.getMonth() - 1);
   selectedDay.value = null;
 };
 
 const nextMonth = () => {
+  if (!canGoNext.value) return; // 미래 월 제한
   currentDate.value = new Date(currentDate.value.getFullYear(), currentDate.value.getMonth() + 1);
   selectedDay.value = null;
 };
 
 function selectDate(day: number) {
-  // do nothing for empty cells
-  if (day === 0) return
-  const job = activeJob?.value ?? (props.activeJob as any)
-  if (!job || !job.id) return
+  if (day === 0) return;
+  const employeeId = activeJob?.value?.id;
+  if (!employeeId) return;
 
-  selectedDay.value = day
-  if (!calendarData.value) return
-  const d = calendarData.value.dates.find((x: any) => x.day === day)
-  modalDateIso.value = d?.date || `${currentYear.value}-${String(currentMonth.value).padStart(2,'0')}-${String(day).padStart(2,'0')}`
-  modalRecord.value = d?.record || null
-  modalVisible.value = true
+  // 미래 월의 날짜는 클릭 불가
+  if (isFutureMonth.value) {
+    alert('미래 날짜에는 근로 기록을 입력할 수 없습니다.');
+    return;
+  }
+
+  selectedDay.value = day;
+  
+  const dateIso = `${currentYear.value}-${String(currentMonth.value).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  
+  modalDateIso.value = dateIso;
+  
+  // 해당 날짜의 실제 근로기록 조회
+  loadWorkRecordForDate(employeeId, dateIso);
+  
+  modalVisible.value = true;
 }
 
-function onModalSaved() {
-  modalVisible.value = false
-  modalRecord.value = null
-  // reload calendar data
-  loadCalendar()
+async function loadWorkRecordForDate(employeeId: number, dateIso: string) {
+  try {
+    // date-schedule API를 사용하여 해당 날짜의 근로기록과 스케줄 정보 조회
+    const res = await apiClient.get(`/labor/jobs/${employeeId}/date-schedule/`, {
+      params: {
+        date: dateIso
+      }
+    });
+    
+    // API 응답 전체 확인
+    console.log('[WorkCalendar] Full API response:', JSON.stringify(res.data));
+    console.log('[WorkCalendar] work_record:', res.data.work_record);
+    console.log('[WorkCalendar] work_record type:', typeof res.data.work_record);
+    console.log('[WorkCalendar] has_schedule:', res.data.has_schedule);
+    
+    // work_record가 있으면 사용, 없으면 스케줄 정보를 포함한 객체 생성
+    if (res.data && res.data.work_record) {
+      modalRecord.value = res.data.work_record;
+      console.log('[WorkCalendar] Found work record:', modalRecord.value);
+    } else if (res.data && res.data.has_schedule) {
+      // 실제 근로기록은 없지만 스케줄이 있는 경우 스케줄 정보 전달
+      modalRecord.value = {
+        schedule_only: true,
+        start_time: res.data.start_time,
+        end_time: res.data.end_time
+      };
+      console.log('[WorkCalendar] Found schedule for', dateIso, ':', modalRecord.value);
+    } else {
+      modalRecord.value = null;
+      console.log('[WorkCalendar] No work record or schedule found for', dateIso);
+    }
+  } catch (e) {
+    console.error('[WorkCalendar] Failed to load work record', e);
+    modalRecord.value = null;
+  }
 }
 
-function onModalDeleted() {
-  modalVisible.value = false
-  modalRecord.value = null
-  loadCalendar()
+function onModalClose() {
+  modalVisible.value = false;
+  selectedDay.value = null;
+  modalRecord.value = null;
 }
 
-// expose nothing
+// 월별 스케줄 모달 관련 함수
+function openMonthlyScheduleModal() {
+  monthlyScheduleModalOpen.value = true
+}
+
+function closeMonthlyScheduleModal() {
+  monthlyScheduleModalOpen.value = false
+}
+
+async function onMonthlyScheduleSaved() {
+  closeMonthlyScheduleModal()
+  // 캘린더 다시 로드하여 변경된 스케줄 반영
+  await loadCalendar()
+  emit('statsUpdated')
+}
+
+async function onModalSaved(responseData?: any) {
+  modalVisible.value = false;
+  modalRecord.value = null;
+  selectedDay.value = null; // 선택된 날짜 초기화
+  
+  // 응답 데이터에 최신 통계가 있으면 사용, 없으면 다시 로드
+  if (responseData && responseData.dates && responseData.stats) {
+    calendarData.value = responseData.dates;
+    // 캘린더 데이터만 업데이트하고, 통계는 WorkSummaryCard에서 현재 월 기준으로 다시 로드
+    emit('statsUpdated');
+  } else {
+    await loadCalendar();
+    emit('statsUpdated');
+  }
+}
+
+async function onModalDeleted(responseData?: any) {
+  console.log('[WorkCalendar] onModalDeleted called with:', responseData);
+  modalVisible.value = false;
+  modalRecord.value = null;
+  selectedDay.value = null; // 선택된 날짜 초기화 - 중요!
+  
+  // 응답 데이터에 최신 통계가 있으면 사용, 없으면 다시 로드
+  if (responseData && responseData.dates && responseData.stats) {
+    console.log('[WorkCalendar] Using response data from delete');
+    console.log('[WorkCalendar] New dates:', responseData.dates);
+    console.log('[WorkCalendar] New stats:', responseData.stats);
+    calendarData.value = responseData.dates;
+    // 캘린더 데이터만 업데이트하고, 통계는 WorkSummaryCard에서 현재 월 기준으로 다시 로드
+    emit('statsUpdated');
+  } else {
+    console.log('[WorkCalendar] No response data, reloading calendar');
+    await loadCalendar();
+    emit('statsUpdated');
+  }
+}
+
+// 전역 이벤트 리스너 - 스케줄 저장 시 캘린더 자동 갱신
+function handleLaborUpdate() {
+  console.log('[WorkCalendar] Labor updated event received, reloading calendar');
+  loadCalendar();
+}
+
+onMounted(() => {
+  window.addEventListener('labor-updated', handleLaborUpdate);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('labor-updated', handleLaborUpdate);
+});
 </script>
 
 <style scoped>
+.scheduled-day {
+  background-color: #f97316 !important;
+  color: white !important;
+  font-weight: bold !important;
+}
 </style>

@@ -18,13 +18,22 @@
 
       <div class="grid lg:grid-cols-3 gap-6">
         <div class="lg:col-span-2">
-          <WorkCalendar :activeJob="activeJob" />
+          <WorkCalendar 
+            :activeJob="activeJob" 
+            @statsUpdated="handleStatsUpdate"
+            @monthChanged="handleMonthChanged" 
+          />
           <!-- 캘린더 아래 연차휴가 카드 -->
           <LaborAnnualLeaveCard />
         </div>
 
         <div class="lg:col-span-1">
-          <WorkSummaryCard :activeJob="activeJob" />
+          <WorkSummaryCard 
+            ref="summaryCardRef" 
+            :activeJob="activeJob" 
+            :displayYear="selectedYear"
+            :displayMonth="selectedMonth"
+          />
         </div>
       </div>
 
@@ -71,16 +80,37 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue';
 import WorkCalendar from './WorkCalendar.vue';
 import LaborAnnualLeaveCard from './LaborAnnualLeaveCard.vue';
 import WorkSummaryCard from './WorkSummaryCard.vue';
 import { useJob, type Job } from '../stores/jobStore';
 
 const { activeJob } = useJob();
+const summaryCardRef = ref<InstanceType<typeof WorkSummaryCard> | null>(null);
+
+// 캘린더에서 선택된 연/월을 추적
+const selectedYear = ref<number | undefined>(undefined);
+const selectedMonth = ref<number | undefined>(undefined);
 
 // 함수: 시급 포맷팅
-function formatWage(wage: number): string {
-  return wage.toLocaleString('ko-KR') + '원';
+function formatWage(wage: number | string): string {
+  const n = Number(wage) || 0
+  return n.toLocaleString('ko-KR', { maximumFractionDigits: 0, minimumFractionDigits: 0 }) + '원'
+}
+
+// 캘린더에서 월이 변경될 때 호출
+function handleMonthChanged(data: { year: number; month: number }) {
+  console.log('[DashboardContent] Month changed to:', data.year, data.month);
+  selectedYear.value = data.year;
+  selectedMonth.value = data.month;
+}
+
+// 통계 업데이트 핸들러
+function handleStatsUpdate(stats?: any) {
+  if (summaryCardRef.value) {
+    summaryCardRef.value.updateStats(stats);
+  }
 }
 </script>
 

@@ -18,13 +18,7 @@ class Employee(models.Model):
     start_date = models.DateField()
     end_date = models.DateField(null=True, blank=True)
     hourly_rate = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    weekly_hours = models.DecimalField(max_digits=5, decimal_places=2, default=0)
-    daily_hours = models.DecimalField(max_digits=4, decimal_places=2, default=0)
-    has_paid_weekly_holiday = models.BooleanField(default=True)
-    is_severance_eligible = models.BooleanField(default=False)
-    is_current = models.BooleanField(default=True)
     # 추가 필드 (노동법 평가용) - 단순화된 참고 계산을 위한 데이터
-    work_days_per_week = models.IntegerField(null=True, blank=True, help_text="주 근로일수 (없으면 weekly_hours/daily_hours로 추정)")
     attendance_rate_last_year = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True, help_text="작년 출근율 0~1")
     total_wage_last_3m = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, help_text="최근 3개월 총임금")
     total_days_last_3m = models.IntegerField(null=True, blank=True, help_text="최근 3개월 총일수")
@@ -128,3 +122,29 @@ class WorkSchedule(models.Model):
 
     def __str__(self):
         return f"{self.employee} - {self.get_weekday_display()} {self.start_time}-{self.end_time}"
+
+
+class MonthlySchedule(models.Model):
+    """특정 월의 근무 스케줄 오버라이드
+    
+    이 모델은 특정 년월에 대해 기본 주간 스케줄(WorkSchedule)과 다른 
+    근무 패턴을 적용하고 싶을 때 사용합니다.
+    
+    예: 2025년 3월에만 화요일 근무 시간이 달랐던 경우
+    """
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='monthly_schedules')
+    year = models.IntegerField()
+    month = models.IntegerField()  # 1-12
+    weekday = models.IntegerField(choices=WEEKDAY_CHOICES)
+    start_time = models.TimeField(null=True, blank=True)
+    end_time = models.TimeField(null=True, blank=True)
+    enabled = models.BooleanField(default=True)
+    
+    class Meta:
+        unique_together = [['employee', 'year', 'month', 'weekday']]
+        indexes = [
+            models.Index(fields=['employee', 'year', 'month']),
+        ]
+    
+    def __str__(self):
+        return f"{self.employee} - {self.year}-{self.month:02d} {self.get_weekday_display()} {self.start_time}-{self.end_time}"

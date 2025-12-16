@@ -30,9 +30,7 @@ job1 = Employee.objects.create(
     industry="음식료",
     employment_type="알바",
     start_date=date(2025, 1, 1),
-    hourly_rate=Decimal('11500'),
-    weekly_hours=Decimal('30'),
-    is_current=True
+    hourly_rate=Decimal('11500')
 )
 print(f"Created Job: {job1.workplace_name}")
 
@@ -44,9 +42,7 @@ job2 = Employee.objects.create(
     industry="소매",
     employment_type="알바",
     start_date=date(2025, 3, 1),
-    hourly_rate=Decimal('12000'),
-    weekly_hours=Decimal('25'),
-    is_current=True
+    hourly_rate=Decimal('12000')
 )
 print(f"Created Job: {job2.workplace_name}")
 
@@ -58,9 +54,7 @@ job3 = Employee.objects.create(
     industry="교육",
     employment_type="프리랜서",
     start_date=date(2025, 5, 1),
-    hourly_rate=Decimal('30000'),
-    weekly_hours=Decimal('10'),
-    is_current=True
+    hourly_rate=Decimal('30000')
 )
 print(f"Created Job: {job3.workplace_name}")
 

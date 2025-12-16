@@ -10,7 +10,7 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["id", "username", "email", "status", "date_joined", "profile_image_url", "phone_number"]
+        fields = ["id", "username", "nickname", "email", "status", "date_joined", "profile_image_url", "phone_number"]
 
     def get_profile_image_url(self, obj):
         request = self.context.get('request')
@@ -26,11 +26,12 @@ class SignupSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["id", "username", "email", "password"]
+        fields = ["id", "username", "nickname", "email", "password"]
 
     def create(self, validated_data):
         user = User(
             username=validated_data["username"],
+            nickname=validated_data.get("nickname", ""),
             email=validated_data["email"],
         )
         user.set_password(validated_data["password"])
@@ -55,7 +56,7 @@ class ProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["id", "username", "email", "first_name", "last_name", "phone_number", "avatar"]
+        fields = ["id", "username", "nickname", "email", "first_name", "last_name", "phone_number", "avatar"]
 
     def get_avatar(self, obj):
         request = self.context.get('request')
@@ -67,7 +68,8 @@ class ProfileSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         request = self.context.get('request')
-        # 처리할 수 있는 필드: first_name, last_name, email, phone_number
+        # 처리할 수 있는 필드: nickname, first_name, last_name, email, phone_number
+        instance.nickname = validated_data.get('nickname', instance.nickname)
         instance.first_name = validated_data.get('first_name', instance.first_name)
         instance.last_name = validated_data.get('last_name', instance.last_name)
         instance.email = validated_data.get('email', instance.email)

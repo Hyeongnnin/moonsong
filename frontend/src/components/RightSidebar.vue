@@ -38,81 +38,23 @@
       </div>
 
       <!-- 주요 통계 (API 기반) -->
+      <!-- 알바 업적 요약 카드 (NEW) - 항상 표시 -->
+      <div class="mb-6">
+        <UserAchievementCard ref="achievementCardRef" :activeJob="activeJob" />
+      </div>
+
+      <!-- 주휴수당 카드 - 항상 표시 -->
+      <div class="mb-6">
+        <HolidayPayCard ref="holidayPayCardRef" :activeJob="activeJob" />
+      </div>
+
+      <!-- 퇴직금 카드 - 항상 표시 -->
       <div class="mb-8">
-        <h3 class="text-sm font-semibold text-gray-900 mb-4">이번 달 통계</h3>
-        
-        <div v-if="statLoading" class="text-center text-gray-600 text-sm py-4">
-          로딩 중...
-        </div>
-
-        <div v-else-if="jobSummary" class="space-y-3">
-          <div class="bg-brand-50 rounded-lg p-4 border border-brand-100">
-            <p class="text-xs text-gray-600 mb-1">총 근로시간</p>
-            <p class="text-2xl font-bold text-brand-600">{{ jobSummary.total_hours }}시간</p>
-            <p class="text-xs text-gray-500 mt-1">근무일: {{ jobSummary.total_days }}일</p>
-          </div>
-
-          <div class="bg-green-50 rounded-lg p-4 border border-green-100">
-            <p class="text-xs text-gray-600 mb-1">총 급여 예상액</p>
-            <p class="text-2xl font-bold text-green-600">{{ formatSalary(jobSummary.estimated_salary) }}</p>
-            <p class="text-xs text-gray-500 mt-1">시급 {{ formatWage(activeJob?.hourly_rate || 0) }} 기준</p>
-          </div>
-
-          <div class="bg-purple-50 rounded-lg p-4 border border-purple-100">
-            <p class="text-xs text-gray-600 mb-1">이번 주 근로시간</p>
-            <p class="text-2xl font-bold text-purple-600">{{ currentWeekHours }}시간</p>
-            <p class="text-xs text-gray-500 mt-1">예상 급여: {{ formatSalary(currentWeekPay) }}</p>
-          </div>
-        </div>
-
-        <div v-else class="text-center text-gray-600 text-sm py-4">
-          통계 데이터를 불러올 수 없습니다.
-        </div>
+        <RetirementPayCard :activeJob="activeJob" />
       </div>
 
       <!-- 근로조건 평가 카드 -->
       <EvaluationCard />
-
-      <!-- 최근 상담 -->
-      <div class="mb-8 pb-8 border-b border-gray-200 mt-10">
-        <h3 class="text-sm font-semibold text-gray-900 mb-4">최근 상담</h3>
-        <div class="space-y-3">
-          <div class="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:shadow-md transition-shadow cursor-pointer">
-            <div class="flex items-start justify-between mb-2">
-              <p class="text-sm font-medium text-gray-900">주휴수당 계산 방법</p>
-              <span class="text-xs px-2 py-1 rounded-full bg-brand-100 text-brand-700">해결</span>
-            </div>
-            <p class="text-xs text-gray-500">2025.11.20</p>
-          </div>
-
-          <div class="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:shadow-md transition-shadow cursor-pointer">
-            <div class="flex items-start justify-between mb-2">
-              <p class="text-sm font-medium text-gray-900">야근 수당 청구</p>
-              <span class="text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-700">진행중</span>
-            </div>
-            <p class="text-xs text-gray-500">2025.11.18</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- 빠른 링크 -->
-      <div>
-        <h3 class="text-sm font-semibold text-gray-900 mb-4">도움말</h3>
-        <div class="space-y-2">
-          <button class="w-full text-left text-sm text-gray-600 hover:text-gray-900 py-2 px-3 rounded-lg hover:bg-gray-50 transition-colors duration-200">
-            🎓 이용 가이드
-          </button>
-          <button class="w-full text-left text-sm text-gray-600 hover:text-gray-900 py-2 px-3 rounded-lg hover:bg-gray-50 transition-colors duration-200">
-            ❓ 자주 묻는 질문
-          </button>
-          <button class="w-full text-left text-sm text-gray-600 hover:text-gray-900 py-2 px-3 rounded-lg hover:bg-gray-50 transition-colors duration-200">
-            💬 1:1 문의
-          </button>
-          <button class="w-full text-left text-sm text-gray-600 hover:text-gray-900 py-2 px-3 rounded-lg hover:bg-gray-50 transition-colors duration-200">
-            ⚙️ 설정
-          </button>
-        </div>
-      </div>
 
       <!-- JobSelector 모달 컴포넌트 -->
       <JobSelector ref="jobSelectorRef" />
@@ -121,93 +63,60 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useJob, type Job } from '../stores/jobStore'
-import { useLabor, type JobSummary } from '../composables/useLabor'
+import { useJob } from '../stores/jobStore'
+import { useLabor, type MonthlySummary } from '../composables/useLabor'
 import JobSelector from './JobSelector.vue'
 import EvaluationCard from './EvaluationCard.vue'
+import HolidayPayCard from './HolidayPayCard.vue'
+import RetirementPayCard from './RetirementPayCard.vue'
+import UserAchievementCard from './UserAchievementCard.vue'
 import { useUser } from '../stores/userStore'
 
 const router = useRouter()
 const { activeJob } = useJob()
-const { fetchJobSummary, getMonthString } = useLabor()
+const { fetchMonthlySummary } = useLabor()
 
 const { user, fetchMe } = useUser()
 
 const jobSelectorRef = ref<InstanceType<typeof JobSelector> | null>(null)
-const jobSummary = ref<JobSummary | null>(null)
-const statLoading = ref(false)
+const holidayPayCardRef = ref<InstanceType<typeof HolidayPayCard> | null>(null)
+const achievementCardRef = ref<InstanceType<typeof UserAchievementCard> | null>(null)
+// jobSummary is no longer needed for the main stats, but keeping it if needed for other parts (though we removed the UI)
+// Actually we can remove loadJobSummary for the stats part if we fully replace it.
+// user requested "Sidebar has only Holiday Pay Card".
+// So we can remove jobSummary logic if it's not used elsewhere.
+// But let's keep it safe or remove it if unused.
+// "최종적으로 사이드바는 '주휴수당 카드' 하나만 보이도록 구성해주세요" -> Yes.
+// So we don't need jobSummary for the old cards anymore.
 
-const userName = computed(() => user.first_name || user.username || '사용자')
+const userName = computed(() => user.nickname || user.username || '사용자')
 const userRole = computed(() => user.role || '알바생')
-const userInitial = computed(() => (user.first_name || user.username || '사용자').charAt(0))
+const userInitial = computed(() => (user.nickname || user.username || '사용자').charAt(0))
 const userAvatar = computed(() => user.avatar)
 
 onMounted(async () => {
   try { await fetchMe() } catch(e) { /* ignore */ }
-  loadJobSummary()
+  // loadJobSummary() -> Not needed if we remove the old cards
+  window.addEventListener('labor-updated', handleLaborUpdate)
 })
 
-/**
- * Job 변경 시 해당 Job의 월 요약 정보 조회
- */
-async function loadJobSummary() {
-  if (!activeJob.value) return
+onUnmounted(() => {
+  window.removeEventListener('labor-updated', handleLaborUpdate)
+})
 
-  statLoading.value = true
-  try {
-    const month = getMonthString()
-    const summary = await fetchJobSummary(activeJob.value.id, month)
-    jobSummary.value = summary
-  } catch (err) {
-    console.error('Failed to fetch job summary:', err)
-    jobSummary.value = null
-  } finally {
-    statLoading.value = false
+function handleLaborUpdate() {
+  if (holidayPayCardRef.value) {
+    holidayPayCardRef.value.refresh()
+  }
+  if (achievementCardRef.value) {
+    achievementCardRef.value.refresh()
   }
 }
 
-/**
- * 현재 주(week_stats의 마지막)의 시간과 급여
- */
-const currentWeekHours = computed(() => {
-  if (!jobSummary.value || jobSummary.value.week_stats.length === 0) {
-    return 0
-  }
-  const lastWeek = jobSummary.value.week_stats[jobSummary.value.week_stats.length - 1]
-  return lastWeek.hours.toFixed(1)
-})
-
-const currentWeekPay = computed(() => {
-  if (!jobSummary.value || jobSummary.value.week_stats.length === 0) {
-    return 0
-  }
-  const lastWeek = jobSummary.value.week_stats[jobSummary.value.week_stats.length - 1]
-  return lastWeek.pay
-})
-
-// activeJob이 변경되면 통계 다시 로드
-watch(
-  () => activeJob.value?.id,
-  () => {
-    loadJobSummary()
-  },
-)
-
-// 컴포넌트 마운트 시 초기 데이터 로드
-onMounted(() => {
-  loadJobSummary()
-})
-
-// 함수: 금액 포맷팅
-function formatSalary(salary: number): string {
-  return salary.toLocaleString('ko-KR') + '원'
-}
-
-function formatWage(wage: number): string {
-  return wage.toLocaleString('ko-KR') + '원'
-}
+// activeJob이 변경되면 HolidayPayCard는 내부 watch로 자동 업데이트됨.
+// 하지만 명시적으로 refresh를 호출해줄 수도 있음.
 
 // 함수: 프로필 수정 페이지 이동
 function navigateToEditProfile() {

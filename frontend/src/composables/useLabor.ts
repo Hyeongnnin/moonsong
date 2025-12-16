@@ -59,6 +59,14 @@ export interface JobSummary {
   week_stats: WeekStat[]
 }
 
+export interface MonthlySummary {
+  scheduled_total_hours: number;
+  scheduled_estimated_salary: number;
+  scheduled_work_days: number;
+  scheduled_this_week_hours: number;
+  scheduled_this_week_estimated_salary: number;
+}
+
 export interface LaborStats {
   totalHours: number
   totalDays: number
@@ -202,6 +210,29 @@ export function useLabor(accessToken?: string) {
   }
 
   /**
+   * 특정 Job의 주간 스케줄 기반 월별 요약(예상 근무일, 총시간, 예상급여 등) 조회
+   * API: GET /labor/jobs/<id>/monthly-summary/?month=YYYY-MM
+   */
+  async function fetchMonthlySummary(employeeId: number, year: number, month: number): Promise<MonthlySummary | null> {
+    loading.value = true
+    error.value = null
+    try {
+      const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
+      const monthStr = `${year}-${String(month).padStart(2, '0')}`;
+      const response = await apiClient.get<MonthlySummary>(`/labor/jobs/${employeeId}/monthly-summary/`, {
+        params: { month: monthStr },
+        headers,
+      })
+      return response.data
+    } catch (err: any) {
+      error.value = err.response?.data?.detail || '월별 요약 조회 실패'
+      return null
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
    * 현재 월의 통계 계산
    * @param summary - Job 요약 정보
    * @param jobData - Job 데이터 (hourly_wage 등)
@@ -271,6 +302,7 @@ export function useLabor(accessToken?: string) {
     fetchWorkRecords,
     fetchEvaluation,
     fetchAnnualLeave,
+    fetchMonthlySummary,
     calculateStats,
     getMonthString,
     getDateRange,

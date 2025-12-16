@@ -165,8 +165,9 @@ function isJobSelected(jobId: number): boolean {
 }
 
 // 함수: 시급 포맷팅
-function formatWage(wage: number): string {
-  return wage.toLocaleString('ko-KR') + '원'
+function formatWage(wage: number | string): string {
+  const n = Number(wage) || 0
+  return n.toLocaleString('ko-KR', { maximumFractionDigits: 0, minimumFractionDigits: 0 }) + '원'
 }
 
 // 모드 전환: 목록 보기

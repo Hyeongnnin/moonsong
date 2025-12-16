@@ -11,19 +11,19 @@
         <div class="p-4 rounded-lg border" :class="evaluation.min_wage_ok ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'">
           <p class="text-[10px] tracking-wide text-gray-600 mb-1">최저임금</p>
           <p class="text-lg font-bold" :class="evaluation.min_wage_ok ? 'text-green-700' : 'text-red-700'">{{ evaluation.min_wage_ok ? '충족' : '미달' }}</p>
-          <p class="text-[10px] text-gray-500 mt-1">기준 {{ evaluation.min_wage_required.toLocaleString('ko-KR') }}원</p>
+          <p class="text-[10px] text-gray-500 mt-1">기준 {{ (evaluation.min_wage_required || 0).toLocaleString('ko-KR') }}원</p>
         </div>
         <div class="p-4 rounded-lg border bg-blue-50 border-blue-200">
           <p class="text-[10px] tracking-wide text-gray-600 mb-1">주휴수당(예상)</p>
-          <p class="text-lg font-bold text-blue-700">{{ formatWon(evaluation.weekly_holiday_pay) }}</p>
+          <p class="text-lg font-bold text-blue-700">{{ formatWon(evaluation.weekly_holiday_pay || 0) }}</p>
         </div>
         <div class="p-4 rounded-lg border bg-purple-50 border-purple-200">
           <p class="text-[10px] tracking-wide text-gray-600 mb-1">연차 발생일수</p>
-          <p class="text-lg font-bold text-purple-700">{{ evaluation.annual_leave_days }}</p>
+          <p class="text-lg font-bold text-purple-700">{{ evaluation.annual_leave_days || 0 }}</p>
         </div>
         <div class="p-4 rounded-lg border bg-amber-50 border-amber-200">
           <p class="text-[10px] tracking-wide text-gray-600 mb-1">퇴직금(예상)</p>
-          <p class="text-lg font-bold text-amber-700">{{ formatWon(evaluation.severance_estimate) }}</p>
+          <p class="text-lg font-bold text-amber-700">{{ formatWon(evaluation.severance_estimate || 0) }}</p>
         </div>
       </div>
       <div v-if="evaluation.warnings.length" class="p-3 rounded-lg bg-red-50 border border-red-200">
