@@ -1,94 +1,94 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
+  <div class="h-screen bg-gray-50 flex flex-col overflow-hidden">
     <TopNav />
 
-    <!-- Full width section with centered two-column group -->
-    <div class="w-full px-0 py-4">
-      <!-- Centered container that groups main + right sidebar; constrains overall width and centers it -->
-      <!-- max-w를 1200 → 1320으로 늘려 메인 컨텐츠를 약 10% 넓게 -->
-      <div class="mx-auto w-full max-w-[1320px] px-4">
-        <!-- Grid: main (left) + sidebar (right). main : sidebar = 2fr : 1fr -->
-        <!-- gap을 48 → 40으로 살짝 줄여 가운데 영역이 좀 더 넓어 보이게 -->
-        <div class="grid items-start" style="grid-template-columns: 2fr 360px; gap: 40px;">
+    <!-- Entire content area -->
+    <main class="flex-1 min-h-0 w-full flex flex-col overflow-hidden">
+      <!-- Centered container -->
+      <div class="flex-1 min-h-0 w-full max-w-[1320px] mx-auto px-4 py-4">
+        <!-- Grid: main (left) + sidebar (right) -->
+        <div class="grid h-full items-stretch" style="grid-template-columns: 2fr 360px; gap: 40px;">
 
-          <!-- Main column (탭 및 슬라이더) -->
-          <div class="min-h-[70vh]">
-            <!-- Section Tabs (근로관리 / AI상담 / 근로정보 수정 / 근로서류) -->
-            <div class="flex gap-2 mb-4 border-b border-gray-200 pb-2 overflow-x-auto">
+          <!-- Main column -->
+          <div class="flex flex-col h-full min-h-0 overflow-hidden">
+            <!-- Section Tabs -->
+            <div class="flex gap-2 mb-4 border-b border-gray-200 pb-2 overflow-x-auto shrink-0">
               <button
                 v-for="(section, index) in sections"
                 :key="section.id"
                 @click="activeSection = index"
                 class="px-4 py-2 text-sm font-medium whitespace-nowrap rounded-t-lg transition-all duration-200"
                 :class="activeSection === index
-                  ? 'text-brand-600 bg-brand-50 border-b-2 border-brand-600 -mb-[2px]'
-                  : 'text-gray-600 hover:text-brand-600 hover:bg-brand-50'">
+                  ? 'text-brand-600 bg-white border-b-2 border-brand-600 -mb-[2px]'
+                  : 'text-gray-600 hover:text-brand-600 hover:bg-gray-100/50'">
                 {{ section.label }}
               </button>
             </div>
 
-            <!-- Content Slider with slide animation -->
-            <div class="relative h-[calc(100vh-200px)] overflow-hidden bg-transparent">
+            <!-- Content Container (The Unified White Card) -->
+            <div class="relative flex-1 min-h-0 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
               <!-- Arrow buttons -->
               <button
-                class="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/90 shadow flex items-center justify-center hover:bg-white hover:shadow-md transition-all duration-200 text-gray-700 font-bold text-lg"
-                :class="{ 'opacity-40 pointer-events-none': activeSection === 0 }"
+                class="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/95 shadow-xl flex items-center justify-center hover:bg-white hover:scale-110 transition-all duration-200 text-gray-700 font-bold text-lg border border-gray-100"
+                :class="{ 'opacity-30 pointer-events-none': activeSection === 0 }"
                 @click="prevSection"
+                aria-label="Previous Section"
               >
                 ‹
               </button>
 
               <button
-                class="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/90 shadow flex items-center justify-center hover:bg-white hover:shadow-md transition-all duration-200 text-gray-700 font-bold text-lg"
-                :class="{ 'opacity-40 pointer-events-none': activeSection === sections.length - 1 }"
+                class="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/95 shadow-xl flex items-center justify-center hover:bg-white hover:scale-110 transition-all duration-200 text-gray-700 font-bold text-lg border border-gray-100"
+                :class="{ 'opacity-30 pointer-events-none': activeSection === sections.length - 1 }"
                 @click="nextSection"
+                aria-label="Next Section"
               >
                 ›
               </button>
 
               <!-- Sliding content track -->
               <div
-                class="h-full flex transition-transform duration-300 ease-out"
+                class="h-full flex transition-transform duration-500 cubic-bezier(0.4, 0, 0.2, 1)"
                 :style="{ transform: `translateX(-${activeSection * 100}%)` }">
 
                 <!-- Section 0: 근로관리 (LaborDashboard) -->
-                <section class="flex-shrink-0 w-full h-full overflow-y-auto">
+                <section class="flex-shrink-0 w-full h-full overflow-y-auto p-8 custom-scrollbar">
                   <ErrorBoundary>
                     <LaborDashboard />
                   </ErrorBoundary>
                 </section>
 
                 <!-- Section 1: 근로진단 -->
-                <section class="flex-shrink-0 w-full h-full overflow-y-auto">
+                <section class="flex-shrink-0 w-full h-full overflow-y-auto p-8 custom-scrollbar">
                   <LaborDiagnosisSection />
                 </section>
 
                 <!-- Section 2: AI상담 -->
-                <section class="flex-shrink-0 w-full h-full overflow-y-auto">
+                <section class="flex-shrink-0 w-full h-full overflow-y-auto p-8 custom-scrollbar">
                   <AiConsultSection />
                 </section>
 
                 <!-- Section 3: 근로정보 수정 -->
-                <section class="flex-shrink-0 w-full h-full overflow-y-auto">
+                <section class="flex-shrink-0 w-full h-full overflow-y-auto p-8 custom-scrollbar">
                   <LaborEditSection />
                 </section>
 
                 <!-- Section 4: 근로서류 -->
-                <section class="flex-shrink-0 w-full h-full overflow-y-auto">
+                <section class="flex-shrink-0 w-full h-full overflow-y-auto p-8 custom-scrollbar">
                   <DocumentsSection />
                 </section>
               </div>
             </div>
           </div>
 
-          <!-- Right sidebar column: 이제 중앙 그룹 내부에 포함되어 있어 화면에 더 안쪽으로 배치됩니다 -->
-          <aside class="hidden lg:block">
+          <!-- Right sidebar column -->
+          <aside class="hidden lg:block h-full overflow-y-auto pr-1 custom-scrollbar">
             <RightSidebar />
           </aside>
 
         </div>
       </div>
-    </div>
+    </main>
   </div>
 </template>
 
@@ -132,6 +132,11 @@ function handleGoSection(ev: CustomEvent<string>) {
 }
 
 onMounted(async () => {
+  // Lock body scroll for the dashboard layout
+  document.documentElement.style.height = '100%'
+  document.body.style.height = '100%'
+  document.body.style.overflow = 'hidden'
+
   try {
     await initializeJobs()
     
@@ -152,13 +157,17 @@ onMounted(async () => {
 
 // URL 쿼리 파라미터 변경 감지 (실시간 섹션 전환)
 watch(() => route.query.section, (newSection) => {
-  if (newSection) {
-    const sectionIndex = sections.findIndex(s => s.id === newSection)
+  const sectionParam = newSection as string | undefined; // Ensure type is string | undefined
+  if (sectionParam) {
+    const sectionIndex = sections.findIndex(s => s.id === sectionParam);
     if (sectionIndex !== -1) {
-      activeSection.value = sectionIndex
+      activeSection.value = sectionIndex;
     }
+  } else {
+    // If section query param is removed, reset to default or first section
+    activeSection.value = 0; 
   }
-})
+}, { immediate: true }); // immediate: true to run the watcher immediately on component mount
 
 // Navigation functions
 function prevSection() {
@@ -174,6 +183,11 @@ function nextSection() {
 }
 
 onUnmounted(() => {
+  // Restore body scroll when leaving dashboard
+  document.documentElement.style.height = ''
+  document.body.style.height = ''
+  document.body.style.overflow = ''
+
   window.removeEventListener('go-section', handleGoSection as EventListener)
 })
 </script>
@@ -184,9 +198,14 @@ section {
   scroll-behavior: smooth;
 }
 
+/* content track height */
+.flex-shrink-0 {
+  flex-shrink: 0;
+}
+
 /* Responsive: 작은 화면에서는 한 열로 쌓음 */
 @media (max-width: 1024px) {
-  .mx-auto.w-full.max-w-\[1200px\].px-4 { padding-left: 16px; padding-right: 16px; }
+  .mx-auto.w-full.max-w-\[1320px\].px-4 { padding-left: 16px; padding-right: 16px; }
   /* Grid 내부에서 aside 숨김 및 main full width */
   .mx-auto > .grid { display: block; }
   .mx-auto > .grid > aside { display: none !important; }

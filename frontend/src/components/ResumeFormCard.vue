@@ -7,7 +7,7 @@
     </div>
 
     <!-- 입력 폼 (A 카드 스타일) -->
-    <div class="m-0 p-3 md:p-4 border rounded bg-white shadow-sm space-y-3 max-w-2xl mx-auto">
+    <div class="p-4 border rounded bg-white shadow-sm space-y-4">
       <!-- 사진 업로드 -->
       <div class="flex items-start gap-4">
         <div class="w-24 h-30 border-2 border-dashed border-gray-300 rounded overflow-hidden bg-gray-50 flex items-center justify-center">
@@ -27,7 +27,7 @@
       </div>
 
       <!-- 기본 정보 -->
-      <div class="grid gap-2 md:grid-cols-2">
+      <div class="grid gap-3 md:grid-cols-2">
         <div>
           <label class="block text-sm font-medium mb-1">성명 *</label>
           <input v-model.trim="form.name" required type="text" 
@@ -68,9 +68,9 @@
             + 추가
           </button>
         </div>
-          <div v-for="(career, idx) in form.careers" :key="idx" 
-             class="p-2 border rounded bg-gray-50 space-y-2">
-           <div class="grid gap-2 md:grid-cols-[120px,1fr,1fr,auto] items-center">
+        <div v-for="(career, idx) in form.careers" :key="idx" 
+             class="p-3 border rounded bg-gray-50 space-y-2">
+          <div class="grid gap-2 md:grid-cols-[120px,1fr,1fr,auto] items-center">
             <input v-model.trim="career.date" type="text" 
                    placeholder="년월일" 
                    class="px-2 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-brand-200" />
@@ -89,7 +89,7 @@
       </div>
 
       <!-- 작성일 및 서명 -->
-      <div class="grid gap-2 md:grid-cols-2">
+      <div class="grid gap-3 md:grid-cols-2">
         <div>
           <label class="block text-sm font-medium mb-1">작성일</label>
           <input v-model.trim="form.writtenDate" type="text" 
@@ -105,7 +105,7 @@
       </div>
 
       <!-- 저장 옵션 -->
-      <div class="p-2 border rounded bg-gray-50 space-y-2">
+      <div class="p-3 border rounded bg-gray-50 space-y-2">
         <label class="flex items-center gap-2 text-sm font-medium">
           <input type="checkbox" v-model="saveToDocuments" class="h-4 w-4 text-brand-600" />
           생성 시 나의 서류함에 저장
@@ -153,6 +153,18 @@
       </div>
     </div>
 
+    <!-- 실시간 미리보기 -->
+    <div class="mt-8 space-y-4">
+      <div class="flex items-center justify-between border-b pb-2">
+        <h3 class="text-lg font-semibold text-gray-900">서류 미리보기</h3>
+        <p class="text-xs text-gray-500">입력한 내용이 실시간으로 이력서 양식에 반영됩니다.</p>
+      </div>
+      <!-- 고정 높이(520px) 및 내부 스크롤 처리 -->
+      <div class="h-[520px] bg-gray-50 border rounded-lg overflow-auto custom-scrollbar flex justify-center p-4">
+        <ResumePreview :form="form" :photoUrl="photoUrl" />
+      </div>
+    </div>
+
     <!-- 토스트 -->
     <Transition name="toast">
       <div v-if="toast" 
@@ -166,6 +178,7 @@
 <script setup lang="ts">
 import { reactive, ref, computed } from 'vue'
 import { generateResumeDocx, type ResumePayload } from '../api'
+import ResumePreview from './ResumePreview.vue'
 
 const emit = defineEmits(['preview', 'generated'])
 
@@ -234,6 +247,15 @@ function resetForm() {
 }
 
 function buildPayload(): ResumePayload {
+  // careers 데이터를 서버의 experiences 규격으로 변환
+  const experiences = form.careers.map(c => ({
+    company: c.content, // '내용'을 회사명/기관명으로 매핑
+    role: c.note,      // '비고'를 역할/직무로 매핑
+    period: c.date,    // '날짜'를 기간으로 매핑
+    description: '',
+    achievements: []
+  }))
+
   return {
     name: form.name,
     title: '',
@@ -241,7 +263,7 @@ function buildPayload(): ResumePayload {
     email: form.email,
     address: form.address,
     summary: '',
-    experiences: [],
+    experiences: experiences, // 매핑된 데이터 전달
     educations: [],
     skills: [],
     certifications: [],

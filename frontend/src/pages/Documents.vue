@@ -1,7 +1,7 @@
 <template>
   <section class="space-y-4">
     <h2 class="text-2xl font-semibold mb-4">근로서류</h2>
-    <div class="p-4 bg-white rounded shadow space-y-4">
+    <div class="space-y-4 mt-4">
       <!-- 탭 -->
       <div class="flex gap-2 border-b border-gray-200 pb-2">
         <button @click="tab = 'resume'" :class="tabClass(tab === 'resume')">
@@ -16,16 +16,14 @@
       </div>
 
       <!-- 탭 컨텐츠 -->
-      <div class="w-full max-w-3xl px-4 mx-auto">
-        <div v-if="tab === 'resume'">
-          <ResumeFormCard @preview="openPreview" @generated="onGenerated" />
-        </div>
-        <div v-else-if="tab === 'generated'">
-          <GeneratedDocuments ref="docsRef" />
-        </div>
-        <div v-else>
-          <DocumentsTemplates />
-        </div>
+      <div v-if="tab === 'resume'">
+        <ResumeFormCard @preview="openPreview" @generated="onGenerated" />
+      </div>
+      <div v-else-if="tab === 'generated'">
+        <GeneratedDocuments ref="docsRef" />
+      </div>
+      <div v-else>
+        <DocumentsTemplates />
       </div>
     </div>
 
@@ -39,7 +37,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import ResumeFormCard from '../components/ResumeFormCard.vue'
 import ResumePreviewModal from '../components/ResumePreviewModal.vue'
 import GeneratedDocuments from '../components/GeneratedDocuments.vue'

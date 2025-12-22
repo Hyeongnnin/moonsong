@@ -15,6 +15,7 @@ export interface Job {
   has_paid_weekly_holiday: boolean
   is_severance_eligible: boolean
   is_current: boolean
+  is_workplace_over_5: boolean
 }
 
 // 전역 상태 (싱글톤)
@@ -124,7 +125,7 @@ export function useJob(accessToken?: string) {
       jobs.value.unshift(created)
       // Set as active
       activeJobId.value = created.id
-      try { localStorage.setItem('activeJobId', String(created.id)) } catch (e) {}
+      try { localStorage.setItem('activeJobId', String(created.id)) } catch (e) { }
       return created
     } catch (err: any) {
       console.error('Failed to create job:', err)

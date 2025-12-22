@@ -25,11 +25,7 @@ SECRET_KEY = 'django-insecure-n@l%e)sn#j2#y^cayo9-$m3rrz#et+ciix2dy^y6!hgk+a(hh_
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = [
-    "127.0.0.1",
-    "localhost",
-    "gms.ssafy.io",
-]
+ALLOWED_HOSTS = []
 
 
 # Application definition
@@ -73,11 +69,6 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:8080",  # Vue CLI 예시
     "http://127.0.0.1:5173",
     "http://127.0.0.1:8080",
-    "https://gms.ssafy.io",
-]
-
-CSRF_TRUSTED_ORIGINS = [
-    "https://gms.ssafy.io",
 ]
 
 # 개발 편의를 위해 로컬 DEBUG 모드에서는 모든 출처 허용
@@ -96,11 +87,10 @@ AUTH_USER_MODEL = "accounts.User"
 
 # OpenAI API 키 (GMS에서 환경변수로 내려준다고 가정)
 import os
-from pathlib import Path
 from dotenv import load_dotenv
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(BASE_DIR / ".env")
+# .env 파일 로드
+load_dotenv(os.path.join(BASE_DIR, '.env'))
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
@@ -162,7 +152,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Seoul'
 
 USE_I18N = True
 

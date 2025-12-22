@@ -56,19 +56,27 @@
           </div>
         </div>
 
-        <!-- 총 누적 급여 -->
-        <div class="bg-white bg-opacity-60 rounded-lg p-3 border border-blue-100">
-          <div class="flex items-center justify-between">
+        <!-- 총 누적 급여 (업적 합계) -->
+        <div class="bg-indigo-600 rounded-lg p-4 text-white shadow-md">
+          <div class="flex items-center justify-between mb-2">
             <div class="flex items-center gap-2">
-              <span class="text-xl">💰</span>
-              <div>
-                <p class="text-xs text-gray-600 font-medium">총 누적 급여</p>
-                <p class="text-xs text-gray-500 mt-0.5">순수 근로 기준</p>
-              </div>
+              <span class="text-xl">🏆</span>
+              <p class="text-xs font-bold uppercase tracking-wider opacity-90">업적 합계</p>
             </div>
-            <p class="text-lg font-bold text-indigo-600">
-              {{ formatCurrency(totalEarnings) }}
-            </p>
+            <p class="text-[10px] opacity-80">* 근로급여 + 확정 주휴수당</p>
+          </div>
+          <h4 class="text-2xl font-black mb-2">
+            {{ formatCurrency(achievementTotal) }}
+          </h4>
+          <div class="flex flex-col gap-1 pt-2 border-t border-white border-opacity-20">
+             <div class="flex justify-between text-[11px] opacity-90">
+               <span>근로급여</span>
+               <span>{{ formatCurrency(totalEarnings) }}</span>
+             </div>
+             <div class="flex justify-between text-[11px] opacity-90">
+               <span>주휴수당(누적)</span>
+               <span>+{{ formatCurrency(totalConfirmedHolidayPay) }}</span>
+             </div>
           </div>
         </div>
 
@@ -124,6 +132,8 @@ const { user } = useUser();
 const totalHours = ref(0);
 const totalEarnings = ref(0);
 const totalWorkDays = ref(0);
+const totalConfirmedHolidayPay = ref(0);
+const achievementTotal = ref(0);
 const hasAnyRecords = computed(() => totalHours.value > 0 || totalEarnings.value > 0 || totalWorkDays.value > 0);
 
 const userName = computed(() => user.nickname || user.username || '사용자');
@@ -190,11 +200,15 @@ async function loadAchievementData() {
     totalHours.value = res.data.total_hours || 0;
     totalEarnings.value = res.data.total_earnings || 0;
     totalWorkDays.value = res.data.total_work_days || 0;
+    totalConfirmedHolidayPay.value = res.data.total_confirmed_holiday_pay || 0;
+    achievementTotal.value = res.data.achievement_total || 0;
     
     console.log('[UserAchievementCard] ✅ 값 할당 완료:', {
       totalHours: totalHours.value,
       totalEarnings: totalEarnings.value,
-      totalWorkDays: totalWorkDays.value
+      totalWorkDays: totalWorkDays.value,
+      totalConfirmedHolidayPay: totalConfirmedHolidayPay.value,
+      achievementTotal: achievementTotal.value
     });
   } catch (e) {
     console.error('[UserAchievementCard] Failed to load achievement data', e);

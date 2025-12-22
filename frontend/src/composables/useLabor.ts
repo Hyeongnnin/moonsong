@@ -95,6 +95,34 @@ export interface AnnualLeaveResult {
   reason: string
 }
 
+export interface WeeklyHolidayPayDetail {
+  start: string
+  end: string
+  amount: number
+  is_finished: boolean
+  is_eligible: boolean
+  reason: string
+}
+
+export interface MonthlyHolidayPayInfo {
+  weeks: WeeklyHolidayPayDetail[]
+  confirmed_total: number
+  estimated_total: number
+}
+
+export interface SeveranceData {
+  eligible: boolean
+  severance_pay: number
+  avg_daily_wage: number
+  service_days: number
+  service_months: number
+  method: 'ROLLING_90D_ACTUAL' | 'CONTRACT_ESTIMATE' | 'NONE'
+  reason: string
+  total_wage_last_90d?: number
+  contract_weekly_hours?: number
+  hourly_rate?: number
+}
+
 // ===== State =====
 const jobs = ref<Job[]>([])
 const loading = ref(false)
@@ -237,6 +265,47 @@ export function useLabor(accessToken?: string) {
   }
 
   /**
+   * 특정 월의 주휴수당 정보 조회
+   */
+  async function fetchMonthlyHolidayPay(jobId: number, month: string): Promise<MonthlyHolidayPayInfo> {
+    loading.value = true
+    error.value = null
+    try {
+      const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
+      const response = await apiClient.get<MonthlyHolidayPayInfo>(`/labor/jobs/${jobId}/monthly-holiday-pay/`, {
+        params: { month },
+        headers,
+      })
+      return response.data
+    } catch (err: any) {
+      error.value = err.response?.data?.detail || '주휴수당 정보 조회 실패'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
+   * 퇴직금 정보 조회
+   */
+  async function fetchSeverance(employeeId: number): Promise<SeveranceData> {
+    loading.value = true
+    error.value = null
+    try {
+      const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
+      const response = await apiClient.get<SeveranceData>(`/labor/employees/${employeeId}/severance/`, {
+        headers,
+      })
+      return response.data
+    } catch (err: any) {
+      error.value = err.response?.data?.detail || '퇴직금 정보 조회 실패'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
    * 현재 월의 통계 계산
    * @param summary - Job 요약 정보
    * @param jobData - Job 데이터 (hourly_wage 등)
@@ -307,6 +376,8 @@ export function useLabor(accessToken?: string) {
     fetchEvaluation,
     fetchAnnualLeave,
     fetchMonthlySummary,
+    fetchMonthlyHolidayPay,
+    fetchSeverance,
     calculateStats,
     getMonthString,
     getDateRange,

@@ -18,19 +18,30 @@ class AnnualLeaveSummarySerializer(serializers.Serializer):
 
 class WorkRecordSerializer(serializers.ModelSerializer):
     total_hours = serializers.SerializerMethodField()
+    is_scheduled_workday = serializers.SerializerMethodField()
+    schedule_info = serializers.SerializerMethodField()
 
     class Meta:
         model = WorkRecord
         fields = [
-            'id', 'employee', 'work_date', 'time_in', 'time_out', 'break_minutes',
-            'break_start', 'break_end', 'break_intervals',
-            'day_type', 'attendance_type',
-            'total_hours', 'is_overtime', 'is_night', 'is_holiday'
+            'id', 'employee', 'work_date', 'time_in', 'time_out', 
+            'is_overnight', 'next_day_work_minutes', 'break_minutes',
+            'day_type', 'attendance_type', 'attendance_status',
+            'total_hours', 'is_overtime', 'is_night', 'is_holiday',
+            'is_scheduled_workday', 'schedule_info'
         ]
 
     def get_total_hours(self, obj):
-        """실제 근로시간 계산"""
+        """실제 근로시간 계산 (익일 근무 포함)"""
         return float(obj.get_total_hours())
+    
+    def get_is_scheduled_workday(self, obj):
+        """해당 날짜가 소정근로일인지 여부"""
+        return obj.employee.is_scheduled_workday(obj.work_date)
+    
+    def get_schedule_info(self, obj):
+        """해당 날짜의 스케줄 정보 (기본값 참조용)"""
+        return obj.employee.get_schedule_for_date(obj.work_date)
 
 
 class JobSummarySerializer(serializers.Serializer):
@@ -51,7 +62,10 @@ class WorkScheduleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = WorkSchedule
-        fields = ['id', 'weekday', 'weekday_display', 'start_time', 'end_time', 'enabled']
+        fields = [
+            'id', 'weekday', 'weekday_display', 'start_time', 'end_time', 
+            'is_overnight', 'next_day_work_minutes', 'break_minutes', 'enabled'
+        ]
 
     def get_weekday_display(self, obj):
         return obj.get_weekday_display()
@@ -64,8 +78,8 @@ class MonthlyScheduleSerializer(serializers.ModelSerializer):
         model = MonthlySchedule
         fields = [
             'id', 'year', 'month', 'weekday', 'weekday_display',
-            'start_time', 'end_time', 'enabled',
-            'default_break_minutes_by_weekday', 'weekly_rest_day'
+            'start_time', 'end_time', 'is_overnight', 'next_day_work_minutes', 
+            'break_minutes', 'enabled'
         ]
 
     def get_weekday_display(self, obj):
@@ -80,8 +94,8 @@ class EmployeeSerializer(serializers.ModelSerializer):
         model = Employee
         fields = [
             'id', 'workplace_name', 'workplace_reg_no',
-            'employment_type', 'start_date',
-            'hourly_rate',
+            'employment_type', 'is_workplace_over_5', 'start_date',
+            'hourly_rate', 'contract_weekly_hours',
             'attendance_rate_last_year', 'total_wage_last_3m', 'total_days_last_3m',
             'work_records', 'schedules'
         ]
@@ -95,8 +109,8 @@ class EmployeeUpdateSerializer(serializers.ModelSerializer):
         model = Employee
         fields = [
             'workplace_name', 'workplace_reg_no',
-            'employment_type', 'start_date',
-            'hourly_rate',
+            'employment_type', 'is_workplace_over_5', 'start_date',
+            'hourly_rate', 'contract_weekly_hours',
             'attendance_rate_last_year', 'total_wage_last_3m', 'total_days_last_3m'
         ]
 
@@ -111,3 +125,50 @@ class CalculationResultSerializer(serializers.ModelSerializer):
     class Meta:
         model = CalculationResult
         fields = "__all__"
+
+class PayrollBreakdownSerializer(serializers.Serializer):
+    """일별 급여 상세 내역"""
+    date = serializers.DateField()
+    source = serializers.CharField()  # actual | scheduled | none
+    hours = serializers.FloatField()
+    is_holiday = serializers.BooleanField()
+    holiday_type = serializers.CharField(allow_null=True)
+    day_pay = serializers.IntegerField()
+    holiday_bonus = serializers.IntegerField()
+    night_hours = serializers.FloatField(required=False, default=0)
+    night_bonus = serializers.IntegerField(required=False, default=0)
+    is_future = serializers.BooleanField(required=False, default=False)
+
+
+class PayrollSummaryNestedSerializer(serializers.Serializer):
+    """급여 요약 핵심 정보"""
+    base_pay = serializers.IntegerField()
+    night_extra = serializers.IntegerField()
+    holiday_extra = serializers.IntegerField()
+    total = serializers.IntegerField()
+    total_hours = serializers.FloatField()
+    scheduled_hours = serializers.FloatField()
+
+
+class PayrollSummarySerializer(serializers.Serializer):
+    """월별 급여 집계 및 요약"""
+    month = serializers.CharField()
+    hourly_wage = serializers.IntegerField()
+    workplace_size = serializers.CharField()
+    contract_weekly_hours = serializers.FloatField(allow_null=True)
+    
+    # Top level fields for backward compatibility, now optional
+    total_hours = serializers.FloatField(required=False, default=0)
+    actual_hours = serializers.FloatField(required=False, default=0)
+    scheduled_hours = serializers.FloatField(required=False, default=0)
+    
+    base_pay = serializers.IntegerField(required=False, default=0)
+    holiday_hours = serializers.FloatField(required=False, default=0)
+    holiday_bonus = serializers.IntegerField(required=False, default=0)
+    night_hours = serializers.FloatField(required=False, default=0)
+    night_bonus = serializers.IntegerField(required=False, default=0)
+    estimated_monthly_pay = serializers.IntegerField(required=False, default=0)
+    
+    summary = PayrollSummaryNestedSerializer()
+    rows = PayrollBreakdownSerializer(many=True) # breakdown -> rows
+    notes = serializers.ListField(child=serializers.CharField())

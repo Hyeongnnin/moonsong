@@ -1,14 +1,21 @@
 <template>
   <!-- 선택된 달 통계 카드 - 콘텐츠 기반 높이 -->
   <div class="bg-white rounded-lg border border-gray-200 p-6">
-    <h3 class="text-lg font-semibold text-gray-900 mb-4">{{ statsTitle }}</h3>
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-semibold text-gray-900">{{ statsTitle }}</h3>
+    </div>
 
-    <!-- 빈 상태: 새 알바 생성 직후 안내 CTA -->
-    <div v-if="showSetupCTA" class="text-center py-8">
-      <div class="text-4xl mb-3">🛠️</div>
-      <p class="text-sm text-gray-600 font-medium mb-2">아직 통계가 없어요</p>
-      <p class="text-xs text-gray-500 mb-4">근로정보를 설정하면 이 달의 통계가 표시됩니다</p>
+    <!-- 빈 상태: 미래 달이거나 데이터 없을 때 -->
+    <div v-if="showSetupCTA" class="text-center py-10">
+      <div class="text-4xl mb-3">{{ isFutureMonth ? '🗓️' : '🛠️' }}</div>
+      <p class="text-sm text-gray-600 font-medium mb-2">
+        {{ isFutureMonth ? '아직 근로 전이에요' : '아직 통계가 없어요' }}
+      </p>
+      <p class="text-xs text-gray-500 mb-6">
+        {{ isFutureMonth ? '해당 월의 근로가 시작되면\n실시간 통계가 집계됩니다' : '근로정보를 설정하면 이 달의 통계가 표시됩니다' }}
+      </p>
       <button
+        v-if="!isFutureMonth"
         @click="goToEdit"
         class="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition-colors"
       >
@@ -18,35 +25,69 @@
 
     <!-- 통계 표시 -->
     <div v-else class="space-y-3">
-      <div class="flex items-center justify-between p-4 bg-brand-50 rounded-lg border border-brand-100">
+      <div 
+        class="flex items-center justify-between p-4 rounded-lg border transition-colors"
+        :class="isFutureMonth ? 'bg-gray-50 border-gray-100' : 'bg-brand-50 border-brand-100'"
+      >
         <div>
-          <p class="text-sm font-medium text-gray-700">총 근로시간</p>
-          <p class="text-xs text-gray-500 mt-1">{{ monthLabel }} 누적</p>
+          <p class="text-sm font-medium text-gray-700">총 인정 시간</p>
+          <p class="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-tighter">
+            {{ monthLabel }} 누적
+          </p>
         </div>
-        <p class="text-xl font-bold text-brand-600">{{ monthlyTotalHours.toFixed(1) }}시간</p>
+        <div class="text-right">
+          <p class="text-xl font-bold" :class="isFutureMonth ? 'text-gray-400' : 'text-brand-600'">{{ monthlyTotalHours.toFixed(1) }}시간</p>
+        </div>
       </div>
 
       <button
         type="button"
-        class="flex items-center justify-between w-full p-4 bg-gray-50 rounded-lg border border-transparent transition shadow-none focus-visible:outline-none"
-        :class="monthlyPayroll ? 'hover:bg-white hover:border-brand-200 focus-visible:ring-2 focus-visible:ring-brand-200 cursor-pointer' : 'cursor-not-allowed opacity-60'"
+        class="flex items-center justify-between w-full p-4 bg-gray-50 rounded-lg border border-transparent transition shadow-none focus-visible:outline-none ring-0 focus:ring-0 outline-none"
+        :class="monthlyPayroll ? 'hover:bg-white hover:border-brand-200 focus-visible:ring-2 focus-visible:ring-brand-200 cursor-pointer pointer-events-auto' : 'cursor-not-allowed opacity-60 pointer-events-none'"
         :title="monthlyPayroll ? '급여 계산 근거 보기' : '급여 정보가 없습니다'"
-        :disabled="!monthlyPayroll"
         @click="openBreakdownModal"
       >
         <div class="text-left">
           <p class="text-sm font-medium text-gray-700">급여 예상액</p>
-          <p class="text-xs text-gray-500 mt-1">{{ monthLabel }} 예상</p>
+          <p class="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-tighter">
+            {{ monthLabel }} 예상
+          </p>
         </div>
         <p class="text-xl font-bold text-gray-600">{{ formatCurrency(monthlyEstimatedSalary) }}</p>
       </button>
 
       <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
         <div>
-          <p class="text-sm font-medium text-gray-700">총 근로일수</p>
-          <p class="text-xs text-gray-500 mt-1">{{ monthLabel }} 누적</p>
+          <p class="text-sm font-medium text-gray-700">실제 근로시간</p>
+          <p class="text-xs text-gray-400 mt-1">기록된 확정 시간</p>
         </div>
-        <p class="text-xl font-bold text-gray-600">{{ totalWorkDays }}일</p>
+        <p class="text-xl font-bold text-gray-600">{{ actualHours.toFixed(1) }}시간</p>
+      </div>
+
+      <div v-if="nightHours > 0 || (monthlyPayroll?.night_bonus && monthlyPayroll.night_bonus > 0)" class="flex items-center justify-between p-4 bg-indigo-50 bg-opacity-40 rounded-lg border border-indigo-100">
+        <div>
+          <p class="text-sm font-medium text-indigo-900">야간 근로 및 수당</p>
+          <p class="text-[10px] font-bold text-indigo-400 mt-1 uppercase tracking-tighter">22:00 ~ 06:00 가산</p>
+        </div>
+        <div class="text-right">
+          <p class="text-lg font-bold text-indigo-700">{{ nightHours.toFixed(1) }}시간</p>
+          <p class="text-xs font-semibold text-indigo-500">+ {{ formatCurrency(nightBonus) }}</p>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg border-dashed border-2 border-gray-100">
+        <div>
+          <p class="text-sm font-medium text-gray-700">예정 근로시간</p>
+          <p class="text-xs text-gray-400 mt-1">스케줄 기준 합계</p>
+        </div>
+        <p class="text-xl font-bold text-gray-400">{{ scheduledHours.toFixed(1) }}시간</p>
+      </div>
+
+      <!-- 미래 달 안내 문구 -->
+      <div v-if="isFutureMonth" class="mt-4 p-3 bg-blue-50 bg-opacity-50 rounded-lg border border-blue-100">
+         <p class="text-[11px] text-blue-700 leading-relaxed font-medium">
+           ℹ️ 미래의 날짜는 '오늘' 이후 실제 기록이 추가되면 위 수치가 업데이트됩니다.
+         </p>
       </div>
     </div>
   </div>
@@ -70,28 +111,41 @@ interface Props {
   displayMonth?: number;
 }
 
-interface PayrollBreakdown {
-  base_hours: number;
-  overtime_hours: number;
+interface PayrollBreakdownItem {
+  date: string;
+  source: string; // actual | scheduled | none
+  hours: number;
+  is_holiday: boolean;
+  holiday_type: string | null;
+  day_pay: number;
+  holiday_bonus: number;
   night_hours: number;
-  holiday_hours: number;
-  weekly_holiday_hours: number;
-  base_pay: number;
-  overtime_pay: number;
-  night_pay: number;
-  holiday_pay: number;
-  weekly_holiday_pay: number;
+  night_bonus: number;
+  is_future: boolean;
 }
 
-interface MonthlyPayrollResponse {
+interface PayrollSummaryResponse {
   month: string;
+  hourly_wage: number;
+  workplace_size: string;
+  contract_weekly_hours: number | null;
   total_hours: number;
-  total_work_days: number;
-  estimated_salary: number;
-  hourly_wage?: number;
-  holiday_hours?: number;
-  holiday_pay?: number;
-  breakdown?: PayrollBreakdown;
+  actual_hours: number;
+  scheduled_hours: number;
+  base_pay: number;
+  holiday_hours: number;
+  holiday_bonus: number;
+  night_hours: number;
+  night_bonus: number;
+  estimated_monthly_pay: number;
+  summary: {
+    base_pay: number;
+    night_extra: number;
+    holiday_extra: number;
+    total: number;
+  };
+  rows: PayrollBreakdownItem[];
+  notes: string[];
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -101,22 +155,29 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const monthlyTotalHours = ref(0);
+const actualHours = ref(0);
+const scheduledHours = ref(0);
 const monthlyEstimatedSalary = ref(0);
-const totalWorkDays = ref(0);
-const monthlyPayroll = ref<MonthlyPayrollResponse | null>(null);
+const nightHours = ref(0);
+const nightBonus = ref(0);
+const monthlyPayroll = ref<PayrollSummaryResponse | null>(null);
 const breakdownModalVisible = ref(false);
-const hasAnyData = computed(() => (monthlyTotalHours.value > 0 || monthlyEstimatedSalary.value > 0 || totalWorkDays.value > 0));
+
+const hasAnyData = computed(() => (monthlyTotalHours.value > 0 || monthlyEstimatedSalary.value > 0 || scheduledHours.value > 0));
 const isFutureMonth = computed(() => {
   if (!props.displayYear || !props.displayMonth) return false;
   const today = new Date();
   const ty = today.getFullYear();
   const tm = today.getMonth() + 1;
+  // 현재 달보다 미래인지 (년도가 크거나, 년도가 같고 월이 크거나)
   return props.displayYear > ty || (props.displayYear === ty && props.displayMonth > tm);
 });
-// 미래 달은 0값이라도 CTA를 보여주지 않고, 숫자 카드(0 표시)를 그대로 노출한다.
-const showSetupCTA = computed(() => !!props.activeJob && !hasAnyData.value && !isFutureMonth.value);
+
+// 미래 달이라도 스케줄이 있을 수 있으므로 hasAnyData가 true일 수 있음.
+const showSetupCTA = computed(() => !!props.activeJob && !hasAnyData.value);
 const router = useRouter();
 const route = useRoute();
+
 function goToEdit() {
   if (route.path === '/dashboard' && route.query.section === 'profile-edit') {
     window.dispatchEvent(new CustomEvent('go-section', { detail: 'profile-edit' }));
@@ -148,52 +209,57 @@ const formatCurrency = (value: number | undefined | null = 0) => {
 };
 
 // 통계 데이터 로드
-// displayYear/displayMonth가 제공되면 해당 월 기준, 없으면 현재 월 기준
 async function loadJobSummary() {
   const employeeId = props.activeJob?.id;
   if (!employeeId) {
-    monthlyTotalHours.value = 0;
-    monthlyEstimatedSalary.value = 0;
-    totalWorkDays.value = 0;
-    monthlyPayroll.value = null;
+    clearStats();
     return;
   }
 
   try {
     let monthStr: string;
-    
-    // displayYear/displayMonth가 제공되면 해당 월, 없으면 현재 월
     if (props.displayYear && props.displayMonth) {
       monthStr = `${props.displayYear}-${String(props.displayMonth).padStart(2, '0')}`;
-      console.log('[WorkSummaryCard] Loading summary for selected month:', monthStr);
     } else {
       const today = new Date();
       monthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-      console.log('[WorkSummaryCard] Loading summary for current month:', monthStr);
     }
     
-    const res = await apiClient.get(`/labor/jobs/${employeeId}/monthly-payroll/`, {
+    console.log('[WorkSummaryCard] Loading summary for month:', monthStr);
+    
+    const res = await apiClient.get(`/labor/jobs/${employeeId}/payroll-summary/`, {
       params: { month: monthStr }
     });
 
-    const payload = res.data as MonthlyPayrollResponse;
-    monthlyPayroll.value = payload || null;
+    const payload = res.data as PayrollSummaryResponse;
+    monthlyPayroll.value = payload;
 
-    monthlyTotalHours.value = Number(payload?.total_hours) || 0;
-    monthlyEstimatedSalary.value = Number(payload?.estimated_salary) || 0;
-    totalWorkDays.value = Number(payload?.total_work_days) || 0;
+    // Use summary-nested fields if available (v2), otherwise fallback to top-level (v1)
+    monthlyTotalHours.value = payload?.summary?.total_hours ?? payload?.total_hours ?? 0;
+    actualHours.value = payload?.actual_hours || 0;
+    scheduledHours.value = payload?.summary?.scheduled_hours ?? payload?.scheduled_hours ?? 0;
+    monthlyEstimatedSalary.value = payload?.summary?.total ?? payload?.estimated_monthly_pay ?? 0;
+    
+    nightHours.value = payload?.night_hours || 0;
+    nightBonus.value = payload?.summary?.night_extra ?? payload?.night_bonus ?? 0;
   } catch (e) {
     console.error('[WorkSummaryCard] Failed to load job summary', e);
-    monthlyTotalHours.value = 0;
-    monthlyEstimatedSalary.value = 0;
-    totalWorkDays.value = 0;
-    monthlyPayroll.value = null;
+    clearStats();
   }
+}
+
+function clearStats() {
+    monthlyTotalHours.value = 0;
+    actualHours.value = 0;
+    scheduledHours.value = 0;
+    monthlyEstimatedSalary.value = 0;
+    nightHours.value = 0;
+    nightBonus.value = 0;
+    monthlyPayroll.value = null;
 }
 
 // 외부에서 통계 업데이트 트리거
 function updateStats(stats?: any) {
-  console.log('[WorkSummaryCard] updateStats called, reloading month data');
   loadJobSummary();
 }
 
@@ -201,6 +267,8 @@ function updateStats(stats?: any) {
 watch([() => props.activeJob?.id, () => props.displayYear, () => props.displayMonth], () => {
   if (props.activeJob) {
     loadJobSummary();
+  } else {
+    clearStats();
   }
 }, { immediate: true });
 

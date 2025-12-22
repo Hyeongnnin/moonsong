@@ -85,3 +85,4 @@ class ConsultationViewSet(viewsets.ModelViewSet):
             },
             status=status.HTTP_201_CREATED,
         )
+

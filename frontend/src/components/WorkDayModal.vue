@@ -7,6 +7,22 @@
       </div>
 
       <div class="space-y-4">
+        <!-- 소정근로일 안내 메시지 (Phase 3) -->
+        <div
+          v-if="isScheduledWorkday"
+          class="flex items-center gap-2 text-sm font-semibold text-orange-700 bg-orange-50 border border-orange-200 rounded px-3 py-2"
+        >
+          <span>📋 소정근로일</span>
+          <span class="text-xs text-orange-600">이 날짜는 근무 예정일입니다</span>
+        </div>
+        <div
+          v-else-if="!isScheduledWorkday && hasAnyTime"
+          class="flex items-center gap-2 text-sm font-semibold text-green-700 bg-green-50 border border-green-200 rounded px-3 py-2"
+        >
+          <span>➕ 추가 근무</span>
+          <span class="text-xs text-green-600">예정일 외 근무입니다</span>
+        </div>
+        
         <div
           v-if="holidayName"
           class="flex items-center gap-2 text-sm font-semibold text-red-600 bg-red-50 border border-red-100 rounded px-3 py-2"
@@ -37,49 +53,59 @@
             class="w-full"
           />
         </div>
-        <div class="flex items-center gap-2">
-          <input id="preciseBreaks" type="checkbox" v-model="usePreciseBreaks" />
-          <label for="preciseBreaks" class="text-sm text-gray-700">정확 계산(선택): 휴게구간 입력</label>
-        </div>
         <div>
           <label class="block text-sm text-gray-700 mb-1">휴게(분)</label>
           <input type="number" v-model.number="breakMinutes" min="0" class="w-full px-3 py-2 border rounded" />
         </div>
-        <div v-if="usePreciseBreaks" class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm text-gray-700 mb-1">휴게 시작</label>
-            <TimeSelect 
-              v-model="breakStart"
-              :options="timeOptions"
-              class="w-full"
+        
+        <!-- 익일 근무 시간 입력 -->
+        <div class="border-t border-gray-200 pt-4 mt-2">
+          <div class="flex items-center gap-2 mb-2">
+            <input 
+              id="hasNextDayWork" 
+              type="checkbox" 
+              v-model="hasNextDayWork" 
+              class="rounded border-gray-300"
             />
+            <label for="hasNextDayWork" class="text-sm font-medium text-gray-700">
+              익일 근무 있음 (24:00~06:00)
+            </label>
           </div>
-          <div>
-            <label class="block text-sm text-gray-700 mb-1">휴게 종료</label>
-            <TimeSelect 
-              v-model="breakEnd"
-              :options="timeOptions"
-              class="w-full"
+          <div v-if="hasNextDayWork" class="ml-6">
+            <label class="block text-sm text-gray-600 mb-1">익일 근무 시간 (분)</label>
+            <input 
+              type="number" 
+              v-model.number="nextDayWorkMinutes" 
+              min="0" 
+              max="360" 
+              step="30"
+              class="w-full px-3 py-2 border rounded text-sm"
+              placeholder="0~360분 (최대 6시간)"
             />
+            <p class="text-xs text-gray-500 mt-1">
+              💡 당일 24:00부터 다음날 06:00 사이의 추가 근로시간을 입력하세요.
+            </p>
+            <p class="text-xs text-brand-600 font-medium mt-1">
+              ✨ 22:00~06:00 사이의 모든 근무(익일 포함)는 50% 가산수당이 자동 적용됩니다.
+            </p>
           </div>
         </div>
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm text-gray-700 mb-1">근무 유형</label>
-            <select v-model="dayType" class="w-full px-3 py-2 border rounded">
-              <option value="NORMAL">일반근무</option>
-              <option value="HOLIDAY_WORK">휴일근무</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm text-gray-700 mb-1">출결 유형</label>
-            <select v-model="attendanceType" class="w-full px-3 py-2 border rounded">
-              <option value="WORKED">근무</option>
-              <option value="APPROVED_LEAVE">승인된 휴무</option>
-              <option value="ABSENT">결근</option>
-            </select>
-          </div>
+        
+        <!-- Phase 3: 출결 상태 선택 (5가지) -->
+        <div>
+          <label class="block text-sm text-gray-700 mb-1 font-medium">출결 상태</label>
+          <select v-model="attendanceStatus" class="w-full px-3 py-2 border rounded">
+            <option value="REGULAR_WORK">✅ 소정근로 (정상 출근)</option>
+            <option value="EXTRA_WORK">➕ 추가근무 (대타/초과근무)</option>
+            <option value="ANNUAL_LEAVE">🌴 연차 사용</option>
+            <option value="ABSENT">❌ 결근</option>
+            <option value="SICK_LEAVE">🤒 병가</option>
+          </select>
+          <p class="text-xs text-gray-500 mt-1">
+            💡 주휴수당 자격: <strong>소정근로</strong>와 <strong>연차</strong>만 출근으로 인정됩니다.
+          </p>
         </div>
+        
         <div v-if="error" class="text-sm text-red-600">{{ error }}</div>
       </div>
 
@@ -120,19 +146,22 @@ const emit = defineEmits(['close', 'saved', 'deleted'])
 const timeIn = ref<string | null>(null)
 const timeOut = ref<string | null>(null)
 const breakMinutes = ref<number>(0)
-const usePreciseBreaks = ref<boolean>(false)
-const breakStart = ref<string | null>(null)
-const breakEnd = ref<string | null>(null)
-const dayType = ref<string>('NORMAL')
-const attendanceType = ref<string>('WORKED')
+const hasNextDayWork = ref<boolean>(false)
+const nextDayWorkMinutes = ref<number>(0)
+const attendanceStatus = ref<string>('REGULAR_WORK')  // Phase 3: 5가지 출결 상태
 const error = ref<string | null>(null)
 const hasSchedule = ref(false)
+const isScheduledWorkday = ref(false)  // Phase 3: 소정근로일 여부
 const hasWorkRecord = computed(() => {
   const result = !!(props.record && props.record.id && !props.record.schedule_only);
   return result;
 })
 
-// 00:00 ~ 23:30까지 30분 단위 시간 옵션 생성
+const hasAnyTime = computed(() => {
+  return !!(timeIn.value || timeOut.value)
+})
+
+// 00:00 ~ 24:00까지 30분 단위 시간 옵션 생성
 const timeOptions = computed(() => {
   const options = []
   for (let h = 0; h < 24; h++) {
@@ -140,6 +169,7 @@ const timeOptions = computed(() => {
     options.push(`${hh}:00`)
     options.push(`${hh}:30`)
   }
+  options.push('24:00')  // 24:00 추가
   return options
 })
 
@@ -171,15 +201,31 @@ function roundToNearest30(timeStr: string | null): string | null {
 }
 
 // props.record 변경 감지 - 실제 근로기록 또는 스케줄 정보 로드
-watch(() => props.record, (r) => {
+watch(() => props.record, async (r) => {
   console.log('[WorkDayModal] Props record changed:', r);
   
   if (r && r.schedule_only) {
     // 스케줄만 있는 경우 (실제 근로기록 없음)
     timeIn.value = roundToNearest30(r.start_time || null);
     timeOut.value = roundToNearest30(r.end_time || null);
-    breakMinutes.value = 60;
+    breakMinutes.value = r.break_minutes || 60;
     hasSchedule.value = true;
+    
+    // 익일 근무 정보
+    hasNextDayWork.value = (r.next_day_work_minutes || 0) > 0;
+    nextDayWorkMinutes.value = r.next_day_work_minutes || 0;
+    
+    // Phase 3: 소정근로일 정보
+    isScheduledWorkday.value = r.is_scheduled_workday || false;
+    attendanceStatus.value = 'REGULAR_WORK';  // 스케줄 기반이면 기본값
+    
+    console.log('[WorkDayModal] 스케줄 기반 데이터 로드:', {
+      timeIn: timeIn.value,
+      timeOut: timeOut.value,
+      breakMinutes: breakMinutes.value,
+      hasNextDayWork: hasNextDayWork.value,
+      nextDayWorkMinutes: nextDayWorkMinutes.value
+    });
   } else if (r && r.id) {
     // 실제 근로기록이 있는 경우
     // DB에는 초 단위까지 있을 수 있으므로 slice 후 반올림 적용
@@ -189,33 +235,117 @@ watch(() => props.record, (r) => {
     timeIn.value = roundToNearest30(rawIn);
     timeOut.value = roundToNearest30(rawOut);
     breakMinutes.value = r.break_minutes || 0;
-    // 휴게 구간 기록 반영
-    const rawBreakStart = r.break_start ? r.break_start.split('T')[1].slice(0,5) : null
-    const rawBreakEnd = r.break_end ? r.break_end.split('T')[1].slice(0,5) : null
-    if (rawBreakStart && rawBreakEnd) {
-      usePreciseBreaks.value = true
-      breakStart.value = roundToNearest30(rawBreakStart)
-      breakEnd.value = roundToNearest30(rawBreakEnd)
-    } else {
-      usePreciseBreaks.value = false
-      breakStart.value = null
-      breakEnd.value = null
-    }
-    // 근무/출결 유형
-    dayType.value = r.day_type || 'NORMAL'
-    attendanceType.value = r.attendance_type || 'WORKED'
+    
+    // 익일 근무 시간 로드
+    hasNextDayWork.value = !!r.next_day_work_minutes && r.next_day_work_minutes > 0;
+    nextDayWorkMinutes.value = r.next_day_work_minutes || 0;
+    
+    // Phase 3: 출결 상태 (백엔드에서 attendance_status 사용)
+    attendanceStatus.value = r.attendance_status || 'REGULAR_WORK';
+    isScheduledWorkday.value = r.is_scheduled_workday || false;
     hasSchedule.value = false;
+    
+    console.log('[WorkDayModal] 실제 근로기록 로드:', {
+      id: r.id,
+      timeIn: timeIn.value,
+      timeOut: timeOut.value,
+      breakMinutes: breakMinutes.value
+    });
   } else {
-    // 근로기록도 스케줄도 없음
-    timeIn.value = null;
-    timeOut.value = null;
-    breakMinutes.value = 0;
-    usePreciseBreaks.value = false
-    breakStart.value = null
-    breakEnd.value = null
-    dayType.value = 'NORMAL'
-    attendanceType.value = 'WORKED'
-    hasSchedule.value = false;
+    // 근로기록도 스케줄도 없음 - 백엔드에서 기본 스케줄 정보 가져오기
+    console.log('[WorkDayModal] 근로기록 없음, date-schedule API 호출:', props.dateIso);
+    
+    if (props.employeeId && props.dateIso) {
+      try {
+        // redundant call 방지: 부모가 이미 props.record를 잘 넘겨줬다면 fetch 스킵
+        if (props.record && props.record.work_date === props.dateIso && !props.record.schedule_only) {
+          console.log('[WorkDayModal] Skipping redundant fetch, using props.record');
+          return;
+        }
+
+        const response = await apiClient.get(
+          `/labor/employees/${props.employeeId}/date-schedule/`,
+          { params: { date: props.dateIso } }
+        );
+        
+        const scheduleInfo = response.data;
+        console.log('[WorkDayModal] date-schedule API 응답:', scheduleInfo);
+        
+        // 실제 근로기록이 API 응답에 포함되어 있다면 그것을 우선 사용
+        if (scheduleInfo.work_record) {
+          const wr = scheduleInfo.work_record;
+          const rawIn = wr.time_in ? wr.time_in.split('T')[1].slice(0, 5) : null;
+          const rawOut = wr.time_out ? wr.time_out.split('T')[1].slice(0, 5) : null;
+          
+          timeIn.value = roundToNearest30(rawIn);
+          timeOut.value = roundToNearest30(rawOut);
+          breakMinutes.value = wr.break_minutes || 0;
+          hasNextDayWork.value = (wr.next_day_work_minutes || 0) > 0;
+          nextDayWorkMinutes.value = wr.next_day_work_minutes || 0;
+          attendanceStatus.value = wr.attendance_status || 'REGULAR_WORK';
+          isScheduledWorkday.value = wr.is_scheduled_workday || false;
+          hasSchedule.value = false;
+          
+          console.log('[WorkDayModal] API 응답의 실제 근로기록 적용:', wr.id);
+        } 
+        // 스케줄 정보가 있으면 기본값으로 설정
+        else if (scheduleInfo.has_schedule && scheduleInfo.start_time && scheduleInfo.end_time) {
+          timeIn.value = scheduleInfo.start_time;  // 이미 HH:MM 형식
+          timeOut.value = scheduleInfo.end_time;   // 이미 HH:MM 형식
+          breakMinutes.value = scheduleInfo.break_minutes || 60;
+          
+          // 익일 근무 정보
+          hasNextDayWork.value = (scheduleInfo.next_day_work_minutes || 0) > 0;
+          nextDayWorkMinutes.value = scheduleInfo.next_day_work_minutes || 0;
+          
+          hasSchedule.value = true;
+          isScheduledWorkday.value = scheduleInfo.is_scheduled_workday || false;
+          attendanceStatus.value = scheduleInfo.suggested_attendance_status || 'REGULAR_WORK';
+          
+          console.log('[WorkDayModal] 스케줄 기본값 적용:', {
+            timeIn: timeIn.value,
+            timeOut: timeOut.value,
+            breakMinutes: breakMinutes.value,
+            hasNextDayWork: hasNextDayWork.value,
+            nextDayWorkMinutes: nextDayWorkMinutes.value,
+            isScheduledWorkday: isScheduledWorkday.value
+          });
+        } else {
+          // 스케줄 정보도 없으면 빈 값
+          timeIn.value = null;
+          timeOut.value = null;
+          breakMinutes.value = 0;
+          hasNextDayWork.value = false;
+          nextDayWorkMinutes.value = 0;
+          attendanceStatus.value = scheduleInfo.suggested_attendance_status || 'EXTRA_WORK';
+          isScheduledWorkday.value = false;
+          hasSchedule.value = false;
+          
+          console.log('[WorkDayModal] 스케줄 없음, 빈 값으로 초기화');
+        }
+      } catch (error) {
+        console.error('[WorkDayModal] date-schedule API 호출 실패:', error);
+        // API 실패 시 빈 값으로 초기화
+        timeIn.value = null;
+        timeOut.value = null;
+        breakMinutes.value = 0;
+        hasNextDayWork.value = false;
+        nextDayWorkMinutes.value = 0;
+        attendanceStatus.value = 'REGULAR_WORK';
+        isScheduledWorkday.value = false;
+        hasSchedule.value = false;
+      }
+    } else {
+      // employeeId나 dateIso가 없으면 빈 값
+      timeIn.value = null;
+      timeOut.value = null;
+      breakMinutes.value = 0;
+      hasNextDayWork.value = false;
+      nextDayWorkMinutes.value = 0;
+      attendanceStatus.value = 'REGULAR_WORK';
+      isScheduledWorkday.value = false;
+      hasSchedule.value = false;
+    }
   }
 }, { immediate: true })
 
@@ -230,8 +360,17 @@ function close() {
 }
 
 function validateTimes() {
-  if (timeIn.value && !/^\d{2}:\d{2}$/.test(timeIn.value)) return '출근 시간이 형식에 맞지 않습니다.'
-  if (timeOut.value && !/^\d{2}:\d{2}$/.test(timeOut.value)) return '퇴근 시간이 형식에 맞지 않습니다.'
+  if (timeIn.value && !/^(\d{2}:\d{2}|24:00)$/.test(timeIn.value)) return '출근 시간이 형식에 맞지 않습니다.'
+  if (timeOut.value && !/^(\d{2}:\d{2}|24:00)$/.test(timeOut.value)) return '퇴근 시간이 형식에 맞지 않습니다.'
+  
+  // 익일 근무 시간 검증
+  if (hasNextDayWork.value) {
+    const minutes = nextDayWorkMinutes.value || 0
+    if (minutes < 0 || minutes > 360) {
+      return '익일 근무 시간은 0~360분 사이여야 합니다.'
+    }
+  }
+  
   return null
 }
 
@@ -251,23 +390,48 @@ async function onSave() {
     employee: props.employeeId,
     work_date: date,
     break_minutes: breakMinutes.value || 0,
-    day_type: dayType.value,
-    attendance_type: attendanceType.value
+    next_day_work_minutes: hasNextDayWork.value ? (nextDayWorkMinutes.value || 0) : 0,
+    attendance_status: attendanceStatus.value  // Phase 3: 새로운 필드
   }
-  if (timeIn.value) payload.time_in = `${date}T${timeIn.value}:00`
-  else payload.time_in = null
-  if (timeOut.value) payload.time_out = `${date}T${timeOut.value}:00`
-  else payload.time_out = null
-  // 정밀 휴게구간 사용 시 break_start/break_end 전달
-  if (usePreciseBreaks.value && breakStart.value && breakEnd.value) {
-    payload.break_start = `${date}T${breakStart.value}:00`
-    payload.break_end = `${date}T${breakEnd.value}:00`
-    payload.break_intervals = null
+  
+  // 시간 변환
+  if (timeIn.value) {
+    if (timeIn.value === '24:00') {
+      const nextDate = new Date(date)
+      nextDate.setDate(nextDate.getDate() + 1)
+      payload.time_in = `${nextDate.toISOString().split('T')[0]}T00:00:00`
+    } else {
+      payload.time_in = `${date}T${timeIn.value}:00`
+    }
   } else {
-    payload.break_start = null
-    payload.break_end = null
-    // intervals는 UI 미지원 (복수 구간은 추후)
-    payload.break_intervals = null
+    payload.time_in = null
+  }
+  
+  if (timeOut.value) {
+    let tOutDate = date
+    let isOver = false
+    
+    // [Fix] 퇴근 시간이 24:00이거나, 출근 시간보다 앞선 경우(예: 22:00 출근 - 02:00 퇴근) 익일로 처리
+    if (timeOut.value === '24:00') {
+      const nextDate = new Date(date)
+      nextDate.setDate(nextDate.getDate() + 1)
+      tOutDate = nextDate.toISOString().split('T')[0]
+      payload.time_out = `${tOutDate}T00:00:00`
+      isOver = true
+    } else {
+      // 출근 시간이 있고, 퇴근 시간이 출근 시간보다 작으면 익일로 간주
+      if (timeIn.value && timeIn.value !== '24:00' && timeOut.value < timeIn.value) {
+        const nextDate = new Date(date)
+        nextDate.setDate(nextDate.getDate() + 1)
+        tOutDate = nextDate.toISOString().split('T')[0]
+        isOver = true
+      }
+      payload.time_out = `${tOutDate}T${timeOut.value}:00`
+    }
+    payload.is_overnight = isOver
+  } else {
+    payload.time_out = null
+    payload.is_overnight = false
   }
 
   console.log('[WorkDayModal] Saving with payload:', payload);
@@ -305,30 +469,43 @@ async function onSave() {
 }
 
 async function onCancelWorkDay() {
-  if (!confirm('정말 이 날짜의 근로를 취소하시겠습니까?\n실제 근로기록이 삭제되거나 빈 기록으로 대체됩니다.')) {
+  if (!confirm('정말 이 날짜의 근로를 취소하시겠습니까?\n소정근로일인 경우 결근으로 처리되며, 그 외의 경우 기록이 삭제됩니다.')) {
     return
   }
   
   error.value = null
   
   try {
-    if (hasWorkRecord.value) {
-      // 실제 기록이 있으면 삭제
-      console.log('[WorkDayModal] Deleting work record:', props.record.id);
-      const response = await apiClient.delete(`/labor/work-records/${props.record.id}/`)
-      emit('deleted', response.data)
-    } else if (hasSchedule.value) {
-      // 스케줄만 있으면 빈 기록 생성하여 덮어쓰기
-      console.log('[WorkDayModal] Creating empty record to cancel schedule');
+    if (isScheduledWorkday.value) {
+      // 소정근로일인 경우: 삭제하지 않고 ABSENT 상태로 저장 (그래야 예정 통계에 합산되지 않음)
+      console.log('[WorkDayModal] Canceling scheduled workday - marking as ABSENT');
       const payload: any = {
         employee: props.employeeId,
         work_date: props.dateIso,
         time_in: null,
         time_out: null,
-        break_minutes: 0
+        break_minutes: 0,
+        attendance_status: 'ABSENT'
       }
-      const response = await apiClient.post('/labor/work-records/', payload)
-      emit('saved', response.data) // Treat as saved since we created a record
+      
+      let response
+      if (hasWorkRecord.value) {
+        response = await apiClient.patch(`/labor/work-records/${props.record.id}/`, payload)
+      } else {
+        response = await apiClient.post('/labor/work-records/', payload)
+      }
+      emit('saved', response.data)
+    } else {
+      // 소정근로일이 아닌 경우: 실제 기록이 있으면 완전 삭제
+      if (hasWorkRecord.value) {
+        console.log('[WorkDayModal] Deleting extra work record:', props.record.id);
+        const response = await apiClient.delete(`/labor/work-records/${props.record.id}/`)
+        emit('deleted', response.data)
+      } else {
+        // 스케줄도 없고 기록도 없는 경우 (이론상 버튼 비활성화)
+        close()
+        return
+      }
     }
     
     window.dispatchEvent(new CustomEvent('labor-updated')) // Auto-refresh sidebar

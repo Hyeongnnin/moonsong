@@ -28,31 +28,28 @@
       <div v-if="loading" class="text-center text-gray-500 py-4 text-sm">
         로딩 중...
       </div>
-
       <div v-else-if="error" class="text-center text-red-500 py-4 text-sm">
         데이터를 불러오는데 실패했습니다.
       </div>
-
-      <div v-else class="bg-brand-50 rounded-lg p-4 border border-brand-100">
-        <div v-if="result.amount > 0">
-          <p class="text-2xl font-bold text-brand-600 mb-1">
-            +{{ formatCurrency(result.amount) }}
-          </p>
+      <div v-else>
+        <!-- 주간 주휴수당 -->
+        <div v-if="result.amount > 0" class="bg-brand-50 rounded-lg p-4 border border-brand-100">
+          <div class="flex items-center gap-1.5 mb-1">
+            <p class="text-2xl font-bold text-brand-600">
+              +{{ formatCurrency(result.amount) }}
+            </p>
+          </div>
           <p class="text-sm text-gray-600">
             주휴시간: {{ result.hours.toFixed(1) }}시간
-          </p>
-          <p class="text-xs text-gray-500 mt-2">
-            실제 근무: {{ result.actual_worked_hours?.toFixed(1) || 0 }}시간
           </p>
         </div>
         
         <div v-else class="text-center py-2">
           <p class="text-gray-500 text-sm font-medium mb-1">
-              <span v-if="result.reason === 'less_than_15h' || result.reason === 'less_than_threshold'">
-                주 {{ result.policy_threshold || 15 }}시간 미만 근무
-                <span class="text-xs block mt-1">(현재: {{ result.actual_worked_hours?.toFixed(1) || 0 }}시간)</span>
+              <span v-if="result.reason === 'less_than_threshold'">
+                주 15시간 미만 근무
               </span>
-              <span v-else-if="result.reason === 'absent'">결근 발생 <span v-if="result.absent_date" class="text-xs">({{ result.absent_date }})</span></span>
+              <span v-else-if="result.reason === 'not_perfect_attendance'">소정근로일 결근</span>
               <span v-else-if="result.reason === 'no_schedule'">스케줄 없음</span>
               <span v-else>발생 금액 없음</span>
           </p>
@@ -60,10 +57,18 @@
               이번 주 주휴수당 대상이 아닙니다
           </p>
         </div>
+
+        <!-- 월 누적 주휴수당 (v2) -->
+        <div class="mt-4 pt-4 border-t border-gray-100">
+          <div class="flex items-center justify-between">
+            <p class="text-xs text-gray-500">이번 달 누적 주휴수당</p>
+            <p class="text-sm font-semibold text-gray-900">+{{ formatCurrency(monthlyInfo.confirmed_total) }}</p>
+          </div>
+        </div>
       </div>
       
-      <div class="mt-4 text-xs text-gray-400">
-          * 주 {{ result.policy_threshold || 15 }}시간 이상 근무 시 발생합니다.
+      <div class="mt-4 text-[10px] text-gray-400 leading-relaxed">
+          * 주휴수당은 1주 소정근로시간 15시간 이상 & 개근 시 발생하며, 급여와 별도로 산정됩니다.
       </div>
     </div>
   </div>
@@ -92,7 +97,12 @@ const result = ref({
   policy_threshold: 0,
   week_start: '',
   week_end: '',
-  absent_date: ''
+  is_eligible: false
+});
+
+const monthlyInfo = ref({
+  confirmed_total: 0,
+  estimated_total: 0
 });
 
 const formatCurrency = (value: number) => {
@@ -138,27 +148,25 @@ const fetchHolidayPay = async () => {
         policy_threshold: 0,
         week_start: '',
         week_end: '',
-        absent_date: ''
+        is_eligible: false
       };
+      monthlyInfo.value = { confirmed_total: 0, estimated_total: 0 };
       return;
   }
-
-  console.log('=== Fetching Holiday Pay ===');
-  console.log('Active Job ID:', props.activeJob.id);
-  console.log('Active Job Name:', props.activeJob.workplace_name);
-  console.log('URL:', `/labor/employees/${props.activeJob.id}/holiday-pay/`);
 
   loading.value = true;
   error.value = false;
   try {
-    const response = await apiClient.get(`/labor/employees/${props.activeJob.id}/holiday-pay/`);
-    console.log('=== Holiday Pay API Response ===');
-    console.log('Full response:', response.data);
-    console.log('Amount:', response.data.amount);
-    console.log('Reason:', response.data.reason);
-    console.log('Actual worked hours:', response.data.actual_worked_hours);
-    console.log('================================');
-    result.value = response.data;
+    const today = new Date();
+    const monthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    
+    const [weeklyRes, monthlyRes] = await Promise.all([
+      apiClient.get(`/labor/employees/${props.activeJob.id}/holiday-pay-v2/`),
+      apiClient.get(`/labor/employees/${props.activeJob.id}/monthly-holiday-pay/`, { params: { month: monthStr } })
+    ]);
+    
+    result.value = weeklyRes.data;
+    monthlyInfo.value = monthlyRes.data;
   } catch (e) {
     console.error('Failed to fetch holiday pay:', e);
     error.value = true;

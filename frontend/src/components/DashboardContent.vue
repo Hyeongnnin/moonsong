@@ -1,5 +1,5 @@
 <template>
-  <div class="bg-white rounded-lg border border-gray-200 p-6">
+  <div>
     <div class="max-w-4xl mx-auto">
       <!-- 현재 선택된 알바 정보 표시 (헤더) -->
       <div v-if="activeJob" class="mb-6 pb-4 border-b border-gray-200">
@@ -42,7 +42,7 @@
         <div class="lg:col-span-1 lg:row-span-1 flex flex-col gap-6">
           <!-- 주휴수당 및 퇴직금 카드 (우측 사이드바에서 이동) -->
           <HolidayPayCard ref="holidayPayCardRef" :activeJob="activeJob" />
-          <RetirementPayCard :activeJob="activeJob" />
+          <SeverancePayCard :activeJob="activeJob" />
         </div>
       </div>
     </div>
@@ -55,7 +55,7 @@ import WorkCalendar from './WorkCalendar.vue';
 import LaborAnnualLeaveCard from './LaborAnnualLeaveCard.vue';
 import WorkSummaryCard from './WorkSummaryCard.vue';
 import HolidayPayCard from './HolidayPayCard.vue';
-import RetirementPayCard from './RetirementPayCard.vue';
+import SeverancePayCard from './SeverancePayCard.vue';
 import { useJob, type Job } from '../stores/jobStore';
 
 const { activeJob } = useJob();
@@ -63,16 +63,16 @@ const summaryCardRef = ref<InstanceType<typeof WorkSummaryCard> | null>(null);
 const holidayPayCardRef = ref<InstanceType<typeof HolidayPayCard> | null>(null);
 const workCalendarRef = ref<InstanceType<typeof WorkCalendar> | null>(null);
 
-// 캘린더에서 선택된 연/월을 추적
-const selectedYear = ref<number | undefined>(undefined);
-const selectedMonth = ref<number | undefined>(undefined);
+// 캘린더에서 선택된 연/월을 추적 (초기값: 현재 월)
+const today = new Date();
+const selectedYear = ref<number>(today.getFullYear());
+const selectedMonth = ref<number>(today.getMonth() + 1);
 
 // labor-updated 이벤트 핸들러
-function handleLaborUpdate(event?: CustomEvent) {
-  // 이벤트에 통계 데이터가 포함되어 있으면 사용
-  if (event?.detail?.stats) {
-    handleStatsUpdate(event.detail.stats);
-  }
+function handleLaborUpdate(event: Event) {
+  const customEvent = event as CustomEvent;
+  // 이벤트에 통계 데이터가 포함되어 있으면 사용, 없으면 카드 내부에서 다시 로드
+  handleStatsUpdate(customEvent.detail?.stats);
   
   // 캘린더 새로고침
   if (workCalendarRef.value) {

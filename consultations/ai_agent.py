@@ -122,7 +122,7 @@ def get_consultation_agent():
 
     # 모델 설정 (기본 gpt-4o, 필요 시 gpt-4.1로 교체 가능)
     llm = ChatOpenAI(
-        model="gpt-4o",
+        model="gpt-5-nano",
         temperature=0,
         api_key=settings.OPENAI_API_KEY,
         base_url=gms_openai_base,  # None이면 기본 OpenAI 엔드포인트 사용

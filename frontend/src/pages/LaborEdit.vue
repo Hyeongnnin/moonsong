@@ -11,8 +11,8 @@
       현재 선택된 알바가 없습니다. 아래 폼을 작성하면 새 알바가 등록되고 자동으로 선택됩니다.
     </div>
 
-    <!-- 폼: 항상 렌더링 -->
-    <div class="bg-white rounded-lg border border-gray-200 p-8 shadow-sm">
+    <!-- 폼 -->
+    <div class="p-4">
       <form @submit.prevent="submitForm">
         <!-- 사업장명 -->
         <div class="mb-6">
@@ -28,23 +28,21 @@
             placeholder="예: Starbucks 강남점">
         </div>
 
-        <!-- 고용형태 -->
+        <!-- 5인 이상 사업장 여부 -->
         <div class="mb-6">
-          <label for="employment_type" class="block text-sm font-semibold text-gray-900 mb-2">
-            고용형태 <span class="text-red-500">*</span>
+          <label for="is_workplace_over_5" class="block text-sm font-semibold text-gray-900 mb-2">
+            5인 이상 사업장인가요?
           </label>
           <select
-            id="employment_type"
-            v-model="formData.employment_type"
-            required
+            id="is_workplace_over_5"
+            v-model="formData.is_workplace_over_5"
             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent transition">
-            <option value="">-- 선택하세요 --</option>
-            <option value="알바">알바</option>
-            <option value="정규직">정규직</option>
-            <option value="계약직">계약직</option>
-            <option value="프리랜서">프리랜서</option>
-            <option value="기타">기타</option>
+            <option :value="false">아니오 (5인 미만)</option>
+            <option :value="true">예 (5인 이상)</option>
           </select>
+          <p class="mt-1 text-xs text-gray-500">
+            사업장 규모에 따라 연차수당 등 근로조건이 달라질 수 있습니다.
+          </p>
         </div>
 
         <!-- 시급 -->
@@ -59,7 +57,7 @@
               type="number"
               required
               min="0"
-              step="100"
+              step="1"
               class="w-full px-4 pr-12 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent transition"
               placeholder="2025년 최저시급은 10030원이에요">
             <span class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500">원</span>
@@ -83,6 +81,37 @@
         <div class="mb-6">
           <h2 class="text-lg font-semibold text-gray-900 mb-2">주간 근무 스케줄</h2>
           <WeeklyScheduleEditor ref="weeklyScheduleEditorRef" :employeeId="activeJob?.id" />
+        </div>
+
+        <!-- 계약상 주 소정근로시간 -->
+        <div class="mb-6">
+          <div class="flex items-center justify-between mb-2">
+            <label for="contract_weekly_hours" class="block text-sm font-semibold text-gray-900">
+              계약상 주 소정근로시간(시간)
+            </label>
+            <button 
+              type="button"
+              @click="autoFillContractHours"
+              class="text-xs font-medium text-brand-600 hover:text-brand-700 bg-brand-50 px-2 py-1 rounded border border-brand-200 transition-colors"
+            >
+              주간 스케줄에서 자동 입력
+            </button>
+          </div>
+          <div class="relative">
+            <input
+              id="contract_weekly_hours"
+              v-model.number="formData.contract_weekly_hours"
+              type="number"
+              min="0"
+              max="60"
+              step="0.5"
+              class="w-full px-4 pr-12 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent transition"
+              placeholder="예: 20, 40">
+            <span class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500">시간</span>
+          </div>
+          <p class="mt-1 text-xs text-gray-500">
+            근로계약서에 적긴 1주 소정근로시간입니다. 주휴/연장 판단 기준으로 사용됩니다.
+          </p>
         </div>
 
         <!-- 에러 메시지 표시 -->
@@ -127,9 +156,11 @@ const { fetchJobSummary, getMonthString, fetchEvaluation } = useLabor()
 const formData = reactive({
   workplace_name: '',
   workplace_reg_no: '',
-  employment_type: '',
+  employment_type: '알바',
+  is_workplace_over_5: false,
   start_date: '',
   hourly_rate: 0,
+  contract_weekly_hours: null as number | null,
   // 평가 추가 필드
   attendance_rate_last_year: null as number | null,
   total_wage_last_3m: null as number | null,
@@ -157,9 +188,11 @@ async function loadFormData() {
       const data = response.data
       formData.workplace_name = data.workplace_name || ''
       formData.workplace_reg_no = data.workplace_reg_no || ''
-      formData.employment_type = data.employment_type || ''
+      formData.employment_type = '알바'
+      formData.is_workplace_over_5 = data.is_workplace_over_5 || false
       formData.start_date = data.start_date || ''
       formData.hourly_rate = parseFloat(data.hourly_rate) || 0
+      formData.contract_weekly_hours = data.contract_weekly_hours ?? null
       formData.attendance_rate_last_year = data.attendance_rate_last_year ?? null
       formData.total_wage_last_3m = data.total_wage_last_3m ?? null
       formData.total_days_last_3m = data.total_days_last_3m ?? null
@@ -229,7 +262,9 @@ async function submitForm() {
       workplace_name: formData.workplace_name,
       workplace_reg_no: formData.workplace_reg_no,
       employment_type: formData.employment_type,
+      is_workplace_over_5: formData.is_workplace_over_5,
       hourly_rate: formData.hourly_rate,
+      contract_weekly_hours: formData.contract_weekly_hours,
       attendance_rate_last_year: formData.attendance_rate_last_year,
       total_wage_last_3m: formData.total_wage_last_3m,
       total_days_last_3m: formData.total_days_last_3m,
@@ -310,6 +345,54 @@ async function submitForm() {
     submitError.value = detail || fieldErrors || '저장에 실패했습니다. 서버 연결 또는 인증을 확인해주세요.'
   } finally {
     isSubmitting.value = false
+  }
+}
+
+/**
+ * 주간 스케줄 합계를 계산하여 계약상 시간에 자동 입력
+ */
+function autoFillContractHours() {
+  const scheduleSnapshot = weeklyScheduleEditorRef.value?.exportSchedules?.()
+  if (!scheduleSnapshot) {
+    alert('설정된 주간 스케줄이 없습니다.')
+    return
+  }
+
+  const schedules = Object.values(scheduleSnapshot)
+  if (schedules.length === 0) {
+    alert('설정된 주간 스케줄이 없습니다.')
+    return
+  }
+
+  let totalMinutes = 0
+  schedules.forEach((s: any) => {
+    if (s.enabled && s.start_time && s.end_time) {
+      const [sh, sm] = s.start_time.split(':').map(Number)
+      const [eh, em] = s.end_time.split(':').map(Number)
+      
+      // 1. 기본 근무 시간 계산 (종료시간 - 시작시간)
+      let diffMinutes = (eh * 60 + em) - (sh * 60 + sm)
+      
+      // 2. 휴게 시간 제외
+      if (s.break_minutes) {
+        diffMinutes -= s.break_minutes
+      }
+      
+      // 3. 익일 근무 시간 추가 (있는 경우)
+      if (s.has_next_day_work && s.next_day_work_minutes) {
+        diffMinutes += s.next_day_work_minutes
+      }
+      
+      totalMinutes += Math.max(0, diffMinutes)
+    }
+  })
+
+  formData.contract_weekly_hours = parseFloat((totalMinutes / 60).toFixed(1))
+  const totalHours = totalMinutes / 60
+  
+  if (totalHours > 40) {
+    // 40시간 초과 시 경고 (법적 소정근로시간 한도는 40시간이지만 계약상 입력은 가능하게 유지)
+    console.warn('법적 소정근로시간은 주 40시간입니다. 계약서 기준이면 괜찮습니다.')
   }
 }
 

@@ -128,7 +128,7 @@ apiClient.interceptors.response.use(
           localStorage.removeItem('refresh');
           localStorage.removeItem('token');
           localStorage.removeItem('auth');
-        } catch (e) { }
+        } catch (e) {}
         onRefreshed(null);
         if (typeof window !== 'undefined') {
           window.location.href = '/login';
@@ -273,11 +273,11 @@ export interface ResumePayload {
   status?: string;
 }
 
-export async function generateResumeDocx(payload: ResumePayload): Promise<{
-  blob: Blob;
-  filename: string;
-  saved: boolean;
-  url?: string
+export async function generateResumeDocx(payload: ResumePayload): Promise<{ 
+  blob: Blob; 
+  filename: string; 
+  saved: boolean; 
+  url?: string 
 }> {
   const res = await apiClient.post(`/documents/resume/generate/`, payload, {
     responseType: 'blob',
@@ -290,7 +290,6 @@ export async function generateResumeDocx(payload: ResumePayload): Promise<{
   const url = res.headers['x-document-url'];
   return { blob: res.data as Blob, filename, saved, url };
 }
-
 // ===================================================================
 // AI 상담 API
 // ===================================================================

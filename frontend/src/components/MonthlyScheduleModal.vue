@@ -31,51 +31,75 @@
             </p>
           </div>
 
-          <!-- 주휴일 및 기본 휴게 설정 -->
-          <div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm text-gray-700 mb-1">주휴일 요일</label>
-              <select v-model="weeklyRestDay" class="w-full px-3 py-2 border rounded">
-                <option :value="null">선택 없음</option>
-                <option v-for="d in weekdays" :key="d.value" :value="d.value">{{ d.label }}</option>
-              </select>
-            </div>
-            <div class="text-sm text-gray-600">
-              각 요일의 기본 휴게시간(분)을 입력하면, 해당 달의 생성되는 근로기록에 참고값으로 저장됩니다.
-            </div>
+          <div class="mb-4 text-sm text-gray-600 flex items-center bg-gray-50 border border-gray-200 rounded-lg p-3">
+            각 요일의 휴게시간은 아래 근무시간 입력란에서 개별 설정할 수 있습니다.
           </div>
 
           <div class="space-y-3">
-            <div v-for="d in weekdays" :key="d.value" class="flex items-center gap-3">
-              <div class="w-16 text-sm font-medium">{{ d.label }}</div>
-              <input type="number" min="0" v-model.number="defaultBreaks[d.value]" class="w-24 px-2 py-1 border rounded" placeholder="휴게(분)" />
-            </div>
-          </div>
-
-          <div class="space-y-3">
-            <div v-for="d in weekdays" :key="d.value" class="flex items-center gap-3">
-              <div class="w-16 text-sm font-medium">{{ d.label }}</div>
+            <div v-for="d in weekdays" :key="d.value" class="border rounded-lg p-3 bg-white">
+              <div class="flex items-center gap-3 mb-2">
+                <div class="w-16 text-sm font-medium">{{ d.label }}</div>
+                
+                <!-- 시작 시간 -->
+                <TimeSelect
+                  v-model="localSchedules[d.value].start_time" 
+                  :options="timeOptions"
+                  :disabled="!localSchedules[d.value].enabled"
+                />
+                
+                <span class="text-xs text-gray-400">~</span>
+                
+                <!-- 종료 시간 -->
+                <TimeSelect
+                  v-model="localSchedules[d.value].end_time" 
+                  :options="timeOptions"
+                  :disabled="!localSchedules[d.value].enabled"
+                />
+                
+                <!-- 휴게시간 입력 -->
+                <div class="flex items-center gap-1">
+                  <span class="text-xs text-gray-500">휴게</span>
+                  <input
+                    type="number"
+                    v-model.number="localSchedules[d.value].break_minutes"
+                    min="0"
+                    max="480"
+                    :disabled="!localSchedules[d.value].enabled"
+                    class="w-16 px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-brand-500 disabled:bg-gray-100 disabled:text-gray-400"
+                    placeholder="0"
+                  />
+                  <span class="text-xs text-gray-500">분</span>
+                </div>
+                
+                <label class="ml-2 inline-flex items-center gap-2 text-sm cursor-pointer select-none">
+                  <input type="checkbox" v-model="localSchedules[d.value].enabled" class="rounded border-gray-300 text-brand-600 focus:ring-brand-500" /> 
+                  <span :class="localSchedules[d.value].enabled ? 'text-gray-900' : 'text-gray-400'">활성</span>
+                </label>
+              </div>
               
-              <!-- 시작 시간 -->
-              <TimeSelect
-                v-model="localSchedules[d.value].start_time" 
-                :options="timeOptions"
-                :disabled="!localSchedules[d.value].enabled"
-              />
-              
-              <span class="text-xs text-gray-400">~</span>
-              
-              <!-- 종료 시간 -->
-              <TimeSelect
-                v-model="localSchedules[d.value].end_time" 
-                :options="timeOptions"
-                :disabled="!localSchedules[d.value].enabled"
-              />
-              
-              <label class="ml-2 inline-flex items-center gap-2 text-sm cursor-pointer select-none">
-                <input type="checkbox" v-model="localSchedules[d.value].enabled" class="rounded border-gray-300 text-brand-600 focus:ring-brand-500" /> 
-                <span :class="localSchedules[d.value].enabled ? 'text-gray-900' : 'text-gray-400'">활성</span>
-              </label>
+              <!-- 익일 근무 입력 섹션 -->
+              <div v-if="localSchedules[d.value].enabled" class="ml-20 flex items-center gap-3">
+                <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
+                  <input 
+                    type="checkbox" 
+                    v-model="localSchedules[d.value].has_next_day_work"
+                    class="rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                  />
+                  <span class="text-gray-700">익일 근무 있음 (24:00~06:00)</span>
+                </label>
+                
+                <div v-if="localSchedules[d.value].has_next_day_work" class="flex items-center gap-2">
+                  <input
+                    type="number"
+                    v-model.number="localSchedules[d.value].next_day_work_minutes"
+                    min="0"
+                    max="360"
+                    class="w-20 px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-brand-500"
+                    placeholder="0"
+                  />
+                  <span class="text-xs text-gray-600">분 (0~360)</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -126,8 +150,9 @@ const weekdays = [
   { value: 6, label: '일' },
 ]
 
-// 00:00 ~ 23:30까지 30분 단위 시간 옵션
-const timeOptions = Array.from({ length: 48 }, (_, i) => {
+// 00:00 ~ 24:00까지 30분 단위 시간 옵션
+const timeOptions = Array.from({ length: 49 }, (_, i) => {
+  if (i === 48) return '24:00'
   const hour = Math.floor(i / 2)
   const minute = (i % 2) * 30
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
@@ -137,24 +162,25 @@ interface ScheduleData {
   enabled: boolean
   start_time: string
   end_time: string
+  has_next_day_work: boolean
+  next_day_work_minutes: number
+  break_minutes: number
 }
 
 const localSchedules = reactive<Record<number, ScheduleData>>({
-  0: { enabled: false, start_time: '09:00', end_time: '18:00' },
-  1: { enabled: false, start_time: '09:00', end_time: '18:00' },
-  2: { enabled: false, start_time: '09:00', end_time: '18:00' },
-  3: { enabled: false, start_time: '09:00', end_time: '18:00' },
-  4: { enabled: false, start_time: '09:00', end_time: '18:00' },
-  5: { enabled: false, start_time: '09:00', end_time: '18:00' },
-  6: { enabled: false, start_time: '09:00', end_time: '18:00' },
+  0: { enabled: false, start_time: '09:00', end_time: '18:00', has_next_day_work: false, next_day_work_minutes: 0, break_minutes: 0 },
+  1: { enabled: false, start_time: '09:00', end_time: '18:00', has_next_day_work: false, next_day_work_minutes: 0, break_minutes: 0 },
+  2: { enabled: false, start_time: '09:00', end_time: '18:00', has_next_day_work: false, next_day_work_minutes: 0, break_minutes: 0 },
+  3: { enabled: false, start_time: '09:00', end_time: '18:00', has_next_day_work: false, next_day_work_minutes: 0, break_minutes: 0 },
+  4: { enabled: false, start_time: '09:00', end_time: '18:00', has_next_day_work: false, next_day_work_minutes: 0, break_minutes: 0 },
+  5: { enabled: false, start_time: '09:00', end_time: '18:00', has_next_day_work: false, next_day_work_minutes: 0, break_minutes: 0 },
+  6: { enabled: false, start_time: '09:00', end_time: '18:00', has_next_day_work: false, next_day_work_minutes: 0, break_minutes: 0 },
 })
 
 const hasOverride = ref(false)
 const isSaving = ref(false)
-const weeklyRestDay = ref<number | null>(null)
-const defaultBreaks = reactive<Record<number, number>>({
-  0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0
-})
+// weeklyRestDay는 사용자 요청으로 제거됨
+// defaultBreaks는 제거됨 - 각 요일별로 break_minutes를 직접 입력받음
 
 // 모달이 열릴 때 현재 스케줄 로드
 watch(() => props.isOpen, async (newVal) => {
@@ -180,29 +206,28 @@ async function loadSchedules() {
     hasOverride.value = response.data.has_override
     const schedules = response.data.schedules || []
     
-    // 스케줄 데이터 채우기
+    console.log('[MonthlyScheduleModal] 로드된 스케줄:', { hasOverride: hasOverride.value, schedules })
+    
+    // 스케줄 데이터 채우기 - 주간 스케줄이 기본값으로 사용됨
     schedules.forEach((schedule: any) => {
       const weekday = schedule.weekday
+      const nextDayMinutes = schedule.next_day_work_minutes || 0
+      const breakMinutes = schedule.break_minutes || 0
+      
       localSchedules[weekday] = {
         enabled: schedule.enabled ?? false,
-        start_time: schedule.start_time || '09:00',
-        end_time: schedule.end_time || '18:00'
+        start_time: schedule.start_time || '09:00',  // 백엔드에서 주간 스케줄 기본값 제공
+        end_time: schedule.end_time || '18:00',      // 백엔드에서 주간 스케줄 기본값 제공
+        has_next_day_work: nextDayMinutes > 0,
+        next_day_work_minutes: nextDayMinutes,
+        break_minutes: breakMinutes
       }
+      
+      console.log(`[MonthlyScheduleModal] 요일 ${weekday} (${['월','화','수','목','금','토','일'][weekday]}):`, 
+        `enabled=${schedule.enabled}, start=${schedule.start_time}, end=${schedule.end_time}, break=${breakMinutes}분`)
     })
 
-    // 월별 메타 데이터 (존재하는 경우 첫 항목에서 로드)
-    const metaSource = schedules.find((s: any) => s.default_break_minutes_by_weekday || s.weekly_rest_day)
-    if (metaSource) {
-      const breaksMap = metaSource.default_break_minutes_by_weekday || {}
-      weekdays.forEach(w => {
-        defaultBreaks[w.value] = breaksMap[w.value] ?? 0
-      })
-      weeklyRestDay.value = typeof metaSource.weekly_rest_day === 'number' ? metaSource.weekly_rest_day : null
-    } else {
-      // 기본값 리셋
-      weekdays.forEach(w => { defaultBreaks[w.value] = 0 })
-      weeklyRestDay.value = null
-    }
+    // 월별 메타 데이터 (weekly_rest_day 로드 로직 제거)
   } catch (error) {
     console.error('Failed to load monthly schedule:', error)
     alert('스케줄을 불러오는데 실패했습니다.')
@@ -219,12 +244,40 @@ async function saveSchedules() {
   isSaving.value = true
   
   try {
-    const schedulesArray = Object.entries(localSchedules).map(([weekday, data]) => ({
-      weekday: parseInt(weekday),
-      start_time: data.enabled ? data.start_time : null,
-      end_time: data.enabled ? data.end_time : null,
-      enabled: data.enabled
-    }))
+    const schedulesArray = Object.entries(localSchedules).map(([weekday, data]) => {
+      // 24:00 처리
+      let endTime = data.end_time
+      let isOvernight = false
+      if (endTime === '24:00') {
+        endTime = '00:00'
+        isOvernight = true
+      }
+      
+      // 익일 근무 시간 처리
+      const nextDayMinutes = data.has_next_day_work ? (data.next_day_work_minutes || 0) : 0
+      
+      // 휴게시간 처리
+      const breakMinutes = data.break_minutes || 0
+      
+      // 밸리데이션
+      if (nextDayMinutes < 0 || nextDayMinutes > 360) {
+        throw new Error(`익일 근무 시간은 0~360분 사이여야 합니다. (현재: ${nextDayMinutes}분)`)
+      }
+      
+      if (breakMinutes < 0 || breakMinutes > 480) {
+        throw new Error(`휴게시간은 0~480분 사이여야 합니다. (현재: ${breakMinutes}분)`)
+      }
+      
+      return {
+        weekday: parseInt(weekday),
+        start_time: data.enabled ? data.start_time : null,
+        end_time: data.enabled ? endTime : null,
+        is_overnight: isOvernight,
+        next_day_work_minutes: nextDayMinutes,
+        break_minutes: breakMinutes,
+        enabled: data.enabled
+      }
+    })
     
     const response = await apiClient.post(
       `/labor/employees/${props.employeeId}/monthly-schedule-override/`,
@@ -232,8 +285,7 @@ async function saveSchedules() {
         year: props.year,
         month: props.month,
         schedules: schedulesArray,
-        default_break_minutes_by_weekday: { ...defaultBreaks },
-        weekly_rest_day: weeklyRestDay.value
+        weekly_rest_day: null // 주휴일 직접 선택 기능 제거
       }
     )
     
@@ -249,9 +301,9 @@ async function saveSchedules() {
       cumulative_stats: response.data.cumulative_stats
     })
     close()
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to save monthly schedule:', error)
-    alert('스케줄 저장에 실패했습니다.')
+    alert(error.message || '스케줄 저장에 실패했습니다.')
   } finally {
     isSaving.value = false
   }

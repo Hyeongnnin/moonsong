@@ -22,56 +22,66 @@
         <p class="text-xs text-red-500">진단 정보를 불러올 수 없습니다</p>
       </div>
 
-      <div v-else class="space-y-3">
+      <div v-else class="space-y-4">
         <!-- 주휴수당 요건 -->
         <div class="flex items-center justify-between py-2">
-          <div class="flex items-center gap-2">
-            <span class="text-lg">{{ diagnosis.holidayPay.icon }}</span>
-            <span class="text-sm text-gray-700">주휴수당 요건</span>
+          <div class="flex flex-col">
+            <span class="text-xs text-brand-600 font-medium mb-0.5">주휴수당</span>
+            <span class="text-sm text-gray-900 font-semibold">받을 수 있나요?</span>
           </div>
-          <div class="flex items-center gap-1">
-            <span :class="diagnosis.holidayPay.statusClass" class="text-sm font-medium">
+          <div class="flex items-center gap-2">
+            <span :class="diagnosis.holidayPay.statusClass" class="text-sm font-bold">
               {{ diagnosis.holidayPay.statusText }}
             </span>
+            <span class="text-lg">{{ diagnosis.holidayPay.icon }}</span>
           </div>
         </div>
+
+        <div class="border-t border-gray-100"></div>
 
         <!-- 퇴직금 요건 -->
         <div class="flex items-center justify-between py-2">
-          <div class="flex items-center gap-2">
-            <span class="text-lg">{{ diagnosis.retirement.icon }}</span>
-            <span class="text-sm text-gray-700">퇴직금 요건</span>
+          <div class="flex flex-col">
+            <span class="text-xs text-brand-600 font-medium mb-0.5">퇴직금</span>
+            <span class="text-sm text-gray-900 font-semibold">받을 수 있나요?</span>
           </div>
-          <div class="flex items-center gap-1">
-            <span :class="diagnosis.retirement.statusClass" class="text-sm font-medium">
+          <div class="flex items-center gap-2">
+            <span :class="diagnosis.retirement.statusClass" class="text-sm font-bold">
               {{ diagnosis.retirement.statusText }}
             </span>
+            <span class="text-lg">{{ diagnosis.retirement.icon }}</span>
           </div>
         </div>
 
-        <!-- 근로시간 준수 -->
+        <div class="border-t border-gray-100"></div>
+
+        <!-- 연차휴가 -->
         <div class="flex items-center justify-between py-2">
-          <div class="flex items-center gap-2">
-            <span class="text-lg">{{ diagnosis.workHours.icon }}</span>
-            <span class="text-sm text-gray-700">주 52시간 준수</span>
+          <div class="flex flex-col">
+            <span class="text-xs text-brand-600 font-medium mb-0.5">연차휴가</span>
+            <span class="text-sm text-gray-900 font-semibold">생기나요?</span>
           </div>
-          <div class="flex items-center gap-1">
-            <span :class="diagnosis.workHours.statusClass" class="text-sm font-medium">
-              {{ diagnosis.workHours.statusText }}
+          <div class="flex items-center gap-2">
+            <span :class="diagnosis.annualLeave.statusClass" class="text-sm font-bold">
+              {{ diagnosis.annualLeave.statusText }}
             </span>
+            <span class="text-lg">{{ diagnosis.annualLeave.icon }}</span>
           </div>
         </div>
 
-        <!-- 필수 휴식시간 -->
+        <div class="border-t border-gray-100"></div>
+
+        <!-- 추가 수당 -->
         <div class="flex items-center justify-between py-2">
-          <div class="flex items-center gap-2">
-            <span class="text-lg">{{ diagnosis.breakTime.icon }}</span>
-            <span class="text-sm text-gray-700">필수 휴식시간</span>
+          <div class="flex flex-col">
+            <span class="text-xs text-brand-600 font-medium mb-0.5">추가 수당</span>
+            <span class="text-sm text-gray-900 font-semibold">적용되나요?</span>
           </div>
-          <div class="flex items-center gap-1">
-            <span :class="diagnosis.breakTime.statusClass" class="text-sm font-medium">
-              {{ diagnosis.breakTime.statusText }}
+          <div class="flex items-center gap-2">
+            <span :class="diagnosis.extraPay.statusClass" class="text-sm font-bold">
+              {{ diagnosis.extraPay.statusText }}
             </span>
+            <span class="text-lg">{{ diagnosis.extraPay.icon }}</span>
           </div>
         </div>
 
@@ -106,16 +116,10 @@ const error = ref(false);
 
 const diagnosisData = ref({
   holidayPayEligible: false,
-  weeklyHours: 0,
   retirementEligible: false,
-  workDays: 0,
-  maxWeeklyHours: 0,
-  exceedsLimit: false,
-  // 휴식시간 관련
-  dailyWorkHours: 0,
-  providedBreakMinutes: 0,
-  requiredBreakMinutes: 0,
-  breakTimeStatus: 'unknown' as 'pass' | 'fail' | 'unknown'
+  annualLeaveEligible: false,
+  extraPayApplicable: false,
+  loading: false
 });
 
 // 진단 결과 computed
@@ -123,28 +127,23 @@ const diagnosis = computed(() => {
   return {
     holidayPay: {
       icon: diagnosisData.value.holidayPayEligible ? '✅' : '❌',
-      statusText: diagnosisData.value.holidayPayEligible ? '충족' : '미충족',
+      statusText: diagnosisData.value.holidayPayEligible ? '받을 수 있어요' : '아직 못 받아요',
       statusClass: diagnosisData.value.holidayPayEligible ? 'text-green-600' : 'text-red-600'
     },
     retirement: {
       icon: diagnosisData.value.retirementEligible ? '✅' : '❌',
-      statusText: diagnosisData.value.retirementEligible ? '충족' : '미충족',
+      statusText: diagnosisData.value.retirementEligible ? '받을 수 있어요' : '아직 아니에요',
       statusClass: diagnosisData.value.retirementEligible ? 'text-green-600' : 'text-red-600'
     },
-    workHours: {
-      icon: !diagnosisData.value.exceedsLimit ? '✅' : '⚠️',
-      statusText: !diagnosisData.value.exceedsLimit ? '준수' : '초과 우려',
-      statusClass: !diagnosisData.value.exceedsLimit ? 'text-green-600' : 'text-yellow-600'
+    annualLeave: {
+      icon: diagnosisData.value.annualLeaveEligible ? '✅' : '❌',
+      statusText: diagnosisData.value.annualLeaveEligible ? '생겨요' : '아직 아니에요',
+      statusClass: diagnosisData.value.annualLeaveEligible ? 'text-green-600' : 'text-red-600'
     },
-    breakTime: {
-      icon: diagnosisData.value.breakTimeStatus === 'pass' ? '✅' : 
-            diagnosisData.value.breakTimeStatus === 'fail' ? '❌' : '🟡',
-      statusText: diagnosisData.value.breakTimeStatus === 'pass' ? '충족' : 
-                  diagnosisData.value.breakTimeStatus === 'fail' 
-                    ? `미충족 (필요 ${diagnosisData.value.requiredBreakMinutes}분 / 제공 ${diagnosisData.value.providedBreakMinutes}분)`
-                    : '판단 불가',
-      statusClass: diagnosisData.value.breakTimeStatus === 'pass' ? 'text-green-600' : 
-                   diagnosisData.value.breakTimeStatus === 'fail' ? 'text-red-600' : 'text-yellow-600'
+    extraPay: {
+      icon: diagnosisData.value.extraPayApplicable ? '✅' : '🟡',
+      statusText: diagnosisData.value.extraPayApplicable ? '적용돼요' : '적용되지 않아요',
+      statusClass: diagnosisData.value.extraPayApplicable ? 'text-green-600' : 'text-yellow-600'
     }
   };
 });
@@ -156,79 +155,28 @@ const fetchDiagnosisData = async () => {
   error.value = false;
 
   try {
-    // 주휴수당 정보 조회
+    // 1. 주휴수당 정보 조회
     const holidayPayRes = await apiClient.get(`/labor/employees/${props.activeJob.id}/holiday-pay/`);
     const holidayPayData = holidayPayRes.data;
 
-    // 퇴직금 정보 조회 (임시로 근속 기간 기반 판단)
-    const startDate = new Date(props.activeJob.start_date);
-    const today = new Date();
-    const workDays = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-    const retirementEligible = workDays >= 365; // 1년 이상 근무
+    // 2. 퇴직금 정보 조회
+    const retirementRes = await apiClient.get(`/labor/employees/${props.activeJob.id}/retirement-pay/`);
+    const retirementData = retirementRes.data;
 
-    // 주간 근무시간 확인
-    const weeklyHours = holidayPayData.actual_worked_hours || holidayPayData.weekly_hours || 0;
-    const exceedsLimit = weeklyHours > 52;
+    // 3. 연차휴가 정보 조회
+    const annualLeaveRes = await apiClient.get(`/labor/employees/${props.activeJob.id}/annual-leave/`);
+    const annualLeaveData = annualLeaveRes.data;
 
-    // 휴식시간 판단 로직
-    // 최근 근로 기록에서 평균 근로시간과 휴게시간 계산
-    let dailyWorkHours = 0;
-    let providedBreakMinutes = 0;
-    let requiredBreakMinutes = 0;
-    let breakTimeStatus: 'pass' | 'fail' | 'unknown' = 'unknown';
-
-    try {
-      // 최근 7일간의 근로 기록 조회
-      const endDate = new Date().toISOString().split('T')[0];
-      const startDateStr = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      
-      const workRecordsRes = await apiClient.get(
-        `/labor/employees/${props.activeJob.id}/work-records/?start=${startDateStr}&end=${endDate}`
-      );
-      const workRecords = workRecordsRes.data;
-
-      if (workRecords && workRecords.length > 0) {
-        // 최근 근무일의 데이터 사용 (첫 번째 레코드)
-        const recentRecord = workRecords[0];
-        
-        if (recentRecord.start_time && recentRecord.end_time) {
-          // 근로시간 계산 (시간 단위)
-          const start = new Date(`2000-01-01T${recentRecord.start_time}`);
-          const end = new Date(`2000-01-01T${recentRecord.end_time}`);
-          dailyWorkHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-
-          // 제공된 휴게시간 (분 단위)
-          providedBreakMinutes = recentRecord.break_minutes || 0;
-
-          // 법정 필요 휴게시간 계산
-          if (dailyWorkHours < 4) {
-            requiredBreakMinutes = 0; // 4시간 미만은 의무 없음
-            breakTimeStatus = 'pass';
-          } else if (dailyWorkHours >= 4 && dailyWorkHours < 8) {
-            requiredBreakMinutes = 30; // 4~8시간은 30분 이상
-            breakTimeStatus = providedBreakMinutes >= 30 ? 'pass' : 'fail';
-          } else {
-            requiredBreakMinutes = 60; // 8시간 이상은 60분 이상
-            breakTimeStatus = providedBreakMinutes >= 60 ? 'pass' : 'fail';
-          }
-        }
-      }
-    } catch (breakErr) {
-      console.warn('휴식시간 데이터 조회 실패:', breakErr);
-      breakTimeStatus = 'unknown';
-    }
+    // 4. 추가 수당 정보 (야간/휴일/연장)
+    // 5인 이상 사업장이면 기본적으로 가산수당 적용 대상
+    const extraPayApplicable = props.activeJob.is_workplace_over_5;
 
     diagnosisData.value = {
-      holidayPayEligible: holidayPayData.amount > 0,
-      weeklyHours,
-      retirementEligible,
-      workDays,
-      maxWeeklyHours: weeklyHours,
-      exceedsLimit,
-      dailyWorkHours,
-      providedBreakMinutes,
-      requiredBreakMinutes,
-      breakTimeStatus
+      holidayPayEligible: (holidayPayData.amount || 0) > 0,
+      retirementEligible: retirementData.eligible || false,
+      annualLeaveEligible: annualLeaveData.available > 0,
+      extraPayApplicable,
+      loading: false
     };
   } catch (err) {
     console.error('근로진단 데이터 조회 실패:', err);

@@ -7,25 +7,15 @@
         <input v-model="form.workplace_name" required class="w-full px-3 py-2 border rounded" />
       </div>
       <div>
-        <label class="block text-sm font-medium mb-1">고용형태</label>
-        <select v-model="form.employment_type" class="w-full px-3 py-2 border rounded">
-          <option value="">-- 선택 --</option>
-          <option value="알바">알바</option>
-          <option value="정규직">정규직</option>
-          <option value="계약직">계약직</option>
+        <label class="block text-sm font-medium mb-1">5인 이상 사업장인가요?</label>
+        <select v-model="form.is_workplace_over_5" class="w-full px-3 py-2 border rounded">
+          <option :value="false">아니오 (5인 미만)</option>
+          <option :value="true">예 (5인 이상)</option>
         </select>
       </div>
       <div>
         <label class="block text-sm font-medium mb-1">시급</label>
         <input v-model.number="form.hourly_rate" type="number" class="w-full px-3 py-2 border rounded" />
-      </div>
-      <div>
-        <label class="block text-sm font-medium mb-1">주당 근로시간</label>
-        <input v-model.number="form.weekly_hours" type="number" class="w-full px-3 py-2 border rounded" />
-      </div>
-      <div>
-        <label class="block text-sm font-medium mb-1">1일 근로시간</label>
-        <input v-model.number="form.daily_hours" type="number" class="w-full px-3 py-2 border rounded" />
       </div>
 
       <!-- 근로 시작일 -->
@@ -66,10 +56,9 @@ const { createJob } = useJob()
 
 const form = reactive({
   workplace_name: '',
-  employment_type: '',
+  employment_type: '알바',
+  is_workplace_over_5: false,
   hourly_rate: 0,
-  weekly_hours: 0,
-  daily_hours: 0,
   start_date: ''
 })
 
@@ -83,9 +72,8 @@ async function onSubmit() {
     const payload = {
       workplace_name: form.workplace_name,
       employment_type: form.employment_type,
+      is_workplace_over_5: form.is_workplace_over_5,
       hourly_rate: form.hourly_rate,
-      weekly_hours: form.weekly_hours,
-      daily_hours: form.daily_hours,
       start_date: form.start_date,
       has_paid_weekly_holiday: true,
       is_severance_eligible: false,

@@ -1,5 +1,5 @@
 <template>
-  <aside class="hidden xl:block bg-white border-l border-gray-200 h-screen sticky top-0 overflow-y-auto w-80">
+  <div class="h-full bg-white">
     <div class="p-6">
       <!-- 프로필 섹션 -->
       <div class="mb-8 pb-8 border-b border-gray-200">
@@ -44,7 +44,7 @@
       <!-- JobSelector 모달 컴포넌트 -->
       <JobSelector ref="jobSelectorRef" />
     </div>
-  </aside>
+  </div>
 </template>
 
 <script setup lang="ts">

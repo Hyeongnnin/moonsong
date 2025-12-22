@@ -76,59 +76,82 @@
       </div>
     </div>
 
-    <!-- 달력 (콘텐츠 기반 높이) -->
-    <div class="grid grid-cols-7 gap-2">
+    <!-- 달력 (콘텐츠 기반 높이) - calendarData 변경 시 전체 리렌더링 -->
+    <div class="grid grid-cols-7 gap-2" :key="`calendar-grid-${currentYear}-${currentMonth}-${calendarVersion}`">
       <button
         v-for="dayObj in calendarDays"
-        :key="dayObj.dateIso || Math.random()"
+        :key="`${currentYear}-${currentMonth}-${dayObj.dateIso || 'empty'}-${calendarVersion}`"
         @click="selectDate(dayObj.day)"
-        :style="dayObj.day !== 0 && selectedDay !== dayObj.day && isDateScheduled(dayObj.dateIso) ? 'background-color: #f97316 !important; color: white !important;' : ''"
-        :class="[
-          'aspect-square flex flex-col items-center justify-center text-sm rounded-lg font-medium transition-all relative',
-          {
-            'text-transparent cursor-default': dayObj.day === 0,
-            'bg-brand-600 text-white shadow-md': dayObj.day !== 0 && selectedDay === dayObj.day,
-            'scheduled-day': dayObj.day !== 0 && selectedDay !== dayObj.day && isDateScheduled(dayObj.dateIso),
-            'text-gray-900 hover:bg-brand-50 bg-white border border-gray-200': dayObj.day !== 0 && selectedDay !== dayObj.day && !isDateScheduled(dayObj.dateIso) && !isFutureMonth && !isWeeklyRest(dayObj.dateIso),
-            'text-sky-700 bg-sky-50 border border-sky-200 ring-1 ring-sky-100': dayObj.day !== 0 && selectedDay !== dayObj.day && !isDateScheduled(dayObj.dateIso) && !isFutureMonth && !isHoliday(dayObj.dateIso) && isWeeklyRest(dayObj.dateIso),
-            'text-gray-400 bg-gray-100 cursor-not-allowed border border-gray-300': dayObj.day !== 0 && isFutureMonth,
-            'ring-2 ring-red-200 text-red-600': dayObj.day !== 0 && isHoliday(dayObj.dateIso) && !isFutureMonth && selectedDay !== dayObj.day
-          }
-        ]"
-        :disabled="dayObj.day === 0 || isFutureMonth"
+        :class="getCellClass(dayObj)"
+        :disabled="!dayObj.day || isFutureMonth"
         :title="cellTitle(dayObj.dateIso, isDateScheduled(dayObj.dateIso))"
       >
-        <span>{{ dayObj.day || '' }}</span>
-        <span
-          v-if="dayObj.day !== 0 && isHoliday(dayObj.dateIso)"
-          class="mt-1 text-[10px] font-semibold text-red-500 leading-tight text-center px-1 truncate w-full"
+        <div
+          v-if="dayObj.day"
+          class="absolute top-1 left-1 text-sm font-extrabold antialiased pointer-events-none"
+          :class="[
+            selectedDay === dayObj.day
+              ? '!text-white !font-black'
+              : (isScheduledWorkday(dayObj.dateIso) && isWorked(dayObj.dateIso))
+              ? (isHoliday(dayObj.dateIso) ? '!text-red-600 !font-black' : '!text-gray-900 !font-black')
+              : (!isScheduledWorkday(dayObj.dateIso) && isWorked(dayObj.dateIso))
+              ? (isHoliday(dayObj.dateIso) ? '!text-red-600 !font-black' : '!text-white !font-black')
+              : isScheduledWorkday(dayObj.dateIso)
+              ? (isHoliday(dayObj.dateIso) ? '!text-red-600 !font-black' : '!text-gray-900 !font-black')
+              : isHoliday(dayObj.dateIso)
+              ? '!text-red-600 !font-bold'
+              : '!text-gray-900 !font-semibold'
+          ]"
+          style="position: absolute; z-index: 30; text-shadow: 0 0 2px rgba(255, 255, 255, 0.5);"
         >
-          {{ holidayNameForDate(dayObj.dateIso) }}
-        </span>
-        <span
-          v-else-if="dayObj.day !== 0 && isWeeklyRest(dayObj.dateIso)"
-          class="mt-1 text-[10px] font-semibold text-sky-600 leading-tight text-center px-1 truncate w-full"
-        >
-          주휴일
-        </span>
-        <span
-          v-else-if="dayObj.day !== 0 && isObservance(dayObj.dateIso)"
-          class="mt-1 text-[10px] font-medium text-gray-400 leading-tight text-center px-1 truncate w-full"
-        >
-          {{ observanceNameForDate(dayObj.dateIso) }}
-        </span>
+          {{ dayObj.day }}
+        </div>
+
+        <!-- ✅ W/M 뱃지 제거: 주간/월별 스케줄 구분은 내부 로직으로만 사용 -->
+
+        <!-- 하단 라벨 영역: 숫자를 가리지 않도록 z-index를 더 올림 -->
+        <div v-if="dayObj.day" class="absolute bottom-1 left-0 right-0 flex flex-col items-center pointer-events-none" style="z-index: 15;">
+          <!-- 공휴일 표시 (최우선) -->
+          <span
+            v-if="isHoliday(dayObj.dateIso)"
+            class="text-[10px] font-semibold text-red-500 leading-tight text-center px-1 truncate max-w-full"
+          >
+            {{ holidayNameForDate(dayObj.dateIso) }}
+          </span>
+          <!-- 주휴일 표시 -->
+          <span
+            v-else-if="isWeeklyRest(dayObj.dateIso)"
+            class="text-[10px] font-semibold text-sky-600 leading-tight text-center px-1 truncate max-w-full"
+          >
+            주휴일
+          </span>
+          <!-- 출결 상태 표시 (소정근로일 여부와 무관하게, 값이 있으면 표시) -->
+          <span
+            v-else-if="!isFutureMonth && getAttendanceStatus(dayObj.dateIso)"
+            class="text-[10px] font-semibold text-orange-600 leading-tight text-center px-1 truncate max-w-full"
+          >
+            {{ getAttendanceStatusLabel(dayObj.dateIso) }}
+          </span>
+          <!-- 기념일 표시 -->
+          <span
+            v-else-if="isObservance(dayObj.dateIso)"
+            class="text-[10px] font-medium text-gray-400 leading-tight text-center px-1 truncate max-w-full"
+          >
+            {{ observanceNameForDate(dayObj.dateIso) }}
+          </span>
+        </div>
       </button>
     </div>
 
     <WorkDayModal 
       v-if="modalVisible" 
-      :visible="modalVisible" 
-      :employeeId="activeJob?.id" 
-      :dateIso="modalDateIso" 
-      :record="modalRecord" 
-      :holidayName="modalHolidayName"
-      :weeklyRestName="modalWeeklyRestName"
-      @close="onModalClose" 
+      :visible="modalVisible"
+      :employeeId="activeJob?.id"
+      :dateIso="modalDateIso"
+      :record="modalRecord"
+      :holidayName="modalHolidayName || undefined"
+      :weeklyRestName="modalWeeklyRestName || undefined"
+      @close="onModalClose"
       @saved="onModalSaved" 
       @deleted="onModalDeleted" 
     />
@@ -159,6 +182,23 @@ interface HolidayApiItem {
   date?: string;
   name?: string;
   type?: string;
+}
+
+// Phase 3: calendar API 응답 타입 (주간/월별 스케줄 정보 추가)
+interface CalendarDateItem {
+  date: string;
+  day: number;
+  is_scheduled_workday?: boolean;  // Phase 3: 소정근로일 여부
+  is_scheduled?: boolean;           // 하위 호환
+  schedule_source?: 'monthly' | 'weekly' | null;  // Phase 3: 스케줄 소스
+  scheduled_start_time?: string | null;  // Phase 3: 스케줄 기반 시작 시간
+  scheduled_end_time?: string | null;    // Phase 3: 스케줄 기반 종료 시간
+  scheduled_break_minutes?: number;      // Phase 3: 스케줄 기반 휴게 시간
+  scheduled_is_overnight?: boolean;      // Phase 3: 익일 근무 여부
+  scheduled_next_day_minutes?: number;   // Phase 3: 익일 근무 시간
+  is_worked?: boolean;              // Phase 3: 실제 근무 여부
+  attendance_status?: string | null; // Phase 3: 출결 상태
+  record?: any;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -238,17 +278,26 @@ const isFutureMonth = computed(() => {
   return false;
 });
 
+// 🔥 calendarDays보다 먼저 선언되어야 함
+const calendarData = ref<CalendarDateItem[]>([]);
+
+
 const calendarDays = computed(() => {
   const year = currentYear.value;
-  const month = currentMonth.value - 1; // getMonth() is 0-indexed
+  const monthDisplay = currentMonth.value; // 1-12 표시용
+  const month = monthDisplay - 1; // 0-11 계산용
   const firstDayOfMonth = new Date(year, month, 1).getDay();
   const lastDateOfMonth = new Date(year, month + 1, 0).getDate();
   
-  const days: { day: number, dateIso?: string }[] = [];
+  // 🔥 핵심: calendarData와 calendarVersion을 참조하여 Vue 의존성 추적
+  const data = calendarData.value;
+  const version = calendarVersion.value;
   
-  // 이전 달의 빈 공간
+  const days: { day: number | null, dateIso?: string, cellClass?: string }[] = [];
+  
+  // 이전 달의 빈 공간 (0 대신 null 사용)
   for (let i = 0; i < firstDayOfMonth; i++) {
-    days.push({ day: 0 });
+    days.push({ day: null });
   }
   
   // 현재 달의 날짜
@@ -258,10 +307,12 @@ const calendarDays = computed(() => {
     days.push({ day: i, dateIso });
   }
   
+  console.log(`[calendarDays ${year}-${monthDisplay} v${version}] computed: ${days.length} days, dataLength=${data.length}`);
+  console.log(`[calendarDays ${year}-${monthDisplay}] First 3:`, days.slice(0, 3));
+  
   return days;
 });
 
-const calendarData = ref<Array<{date: string, is_scheduled: boolean}>>([]);
 const holidayMap = ref<Record<string, string>>({});
 const observanceMap = ref<Record<string, string>>({});
 
@@ -275,29 +326,115 @@ const parseLocalDate = (dateIso?: string): Date | null => {
 };
 
 const scheduledDayMap = computed(() => {
-  const map: Record<string, { is_scheduled: boolean }> = {};
-  if (!calendarData.value || !Array.isArray(calendarData.value)) {
+  // 🔥 명시적으로 currentYear, currentMonth를 의존성에 추가
+  const year = currentYear.value;
+  const month = currentMonth.value;
+  const data = calendarData.value;
+  const version = calendarVersion.value;
+  
+  const map: Record<string, { 
+    is_scheduled_workday: boolean;
+    is_worked: boolean;
+    attendance_status: string | null;
+    schedule_source?: 'monthly' | 'weekly' | null;
+  }> = {};
+  
+  if (!data || !Array.isArray(data)) {
+    console.warn(`[scheduledDayMap ${year}-${month}] calendarData is empty or not an array:`, data);
     return map;
   }
   
-  for (const d of calendarData.value) {
+  console.log(`[scheduledDayMap ${year}-${month} v${version}] Building map from`, data.length, 'dates');
+  
+  for (const d of data) {
     if (d && d.date) {
-      map[d.date] = { is_scheduled: !!d.is_scheduled };
+      // Phase 3: 백엔드 API 응답 필드 사용 (schedule_source 추가)
+      map[d.date] = { 
+        is_scheduled_workday: !!d.is_scheduled_workday,
+        is_worked: !!d.is_worked,
+        attendance_status: d.attendance_status || null,
+        schedule_source: d.schedule_source || null
+      };
+      
+      // 처음 3개 날짜만 상세 로그
+      if (Object.keys(map).length <= 3) {
+        console.log(`[scheduledDayMap ${year}-${month}] ${d.date}:`, JSON.stringify({
+          is_scheduled_workday: d.is_scheduled_workday,
+          is_worked: d.is_worked,
+          schedule_source: d.schedule_source,
+          attendance_status: d.attendance_status,
+          mapped_value: map[d.date]
+        }, null, 2));
+      }
     }
   }
+  
+  console.log(`[scheduledDayMap ${year}-${month}] Total dates in map:`, Object.keys(map).length);
+  console.log(`[scheduledDayMap ${year}-${month}] 소정근로일 개수:`, Object.values(map).filter(v => v.is_scheduled_workday).length);
   
   return map;
 });
 
-// 날짜가 스케줄되어 있는지 확인하는 헬퍼 함수
+// Phase 3: 스케줄 소스 확인 ("monthly" | "weekly" | null)
+const getScheduleSource = (dateIso?: string): 'monthly' | 'weekly' | null => {
+  if (!dateIso) return null;
+  const dayData = calendarData.value.find(d => d.date === dateIso);
+  const source = dayData?.schedule_source || null;
+  
+  // 디버깅: 처음 5개 날짜만 로그
+  if (dayData && parseInt(dateIso.split('-')[2]) <= 5) {
+    console.log(`[getScheduleSource] ${dateIso}:`, {
+      found: !!dayData,
+      schedule_source: dayData?.schedule_source,
+      is_scheduled_workday: dayData?.is_scheduled_workday,
+      result: source
+    });
+  }
+  
+  return source;
+};
+
+// Phase 3: 소정근로일 여부 확인
+const isScheduledWorkday = (dateIso?: string): boolean => {
+  if (!dateIso) {
+    console.warn('[isScheduledWorkday] dateIso is empty');
+    return false;
+  }
+  
+  const mapEntry = scheduledDayMap.value[dateIso];
+  const result = mapEntry?.is_scheduled_workday === true;
+  
+  // 디버깅: 처음 3개 날짜만 상세 로그
+  const day = parseInt(dateIso.split('-')[2]);
+  if (day <= 3) {
+    console.log(`[isScheduledWorkday] ${dateIso}:`, JSON.stringify({
+      has_entry: !!mapEntry,
+      is_scheduled_workday: mapEntry?.is_scheduled_workday,
+      is_worked: mapEntry?.is_worked,
+      schedule_source: mapEntry?.schedule_source,
+      result: result,
+      map_size: Object.keys(scheduledDayMap.value).length
+    }, null, 2));
+  }
+  
+  return result;
+};
+
+// Phase 3: 실제 근무 여부 확인
+const isWorked = (dateIso?: string): boolean => {
+  if (!dateIso) return false;
+  return scheduledDayMap.value[dateIso]?.is_worked === true;
+};
+
+// 날짜가 스케줄되어 있는지 확인하는 헬퍼 함수 (하위 호환성)
 const isDateScheduled = (dateIso?: string): boolean => {
   if (!dateIso) return false;
   
-  // 실제 데이터만 확인 (폴백 로직 제거)
-  const mapEntry = scheduledDayMap.value[dateIso];
-  const result = mapEntry?.is_scheduled === true;
+  // Phase 3: 소정근로일 또는 실제 근무가 있으면 스케줄된 것으로 간주
+  const scheduled = isScheduledWorkday(dateIso);
+  const worked = isWorked(dateIso);
   
-  return result;
+  return scheduled || worked;
 };
 
 const holidayNameForDate = (dateIso?: string): string | undefined => {
@@ -326,6 +463,134 @@ const isWeeklyRest = (dateIso?: string): boolean => {
 
 const weeklyRestNameForDate = (dateIso?: string): string | undefined => {
   return isWeeklyRest(dateIso) ? WEEKLY_REST_LABEL : undefined;
+};
+
+const calendarDataMap = computed(() => {
+  const map = new Map();
+  calendarData.value.forEach(item => {
+    map.set(item.date, item);
+  });
+  return map;
+});
+
+// 날짜 셀의 배경색 클래스를 결정하는 함수
+const getCellClass = (dayObj: { day: number | null, dateIso?: string }): string => {
+  const baseClass = 'aspect-square flex flex-col items-center justify-center text-sm rounded-lg font-medium transition-all relative overflow-hidden';
+  
+  // Placeholder 셀 (날짜 없음)
+  if (!dayObj.day) {
+    return `${baseClass} bg-gray-50 cursor-default`;
+  }
+  
+  const dateIso = dayObj.dateIso || '';
+  const borderClass = 'border border-gray-200';
+  
+  // 🔍 디버깅: 처음 5개 날짜만 상세 로그
+  if (dayObj.day <= 5) {
+    console.log(`[getCellClass] Day ${dayObj.day} (${dateIso}):`, {
+      isScheduled: isScheduledWorkday(dateIso),
+      isWorked: isWorked(dateIso),
+      mapEntry: scheduledDayMap.value[dateIso],
+      calendarDataLength: calendarData.value.length,
+      rawData: calendarData.value.find(d => d.date === dateIso)
+    });
+  }
+  
+  // 1. 미래 월이면 비활성화
+  if (isFutureMonth.value) {
+    return `${baseClass} ${borderClass} text-gray-400 bg-gray-100 cursor-not-allowed opacity-50`;
+  }
+  
+  // 2. 선택된 날짜 (테두리나 밝기 변화로 표현 제안, 여기서는 기존 bg-brand-600 유지하되 우선순위 조정)
+  // 사용자 요구: "선택 상태 때문에 주황색이 칠해지는 일이 없도록"
+  // 해결: 배경색은 스케줄 우선, 선택 상태는 링/테두리로 표현하거나 선택 시에만 덮어쓰기
+  
+  const isScheduled = isScheduledWorkday(dateIso);
+  const isWorkedDay = isWorked(dateIso);
+  const isSelected = selectedDay.value === dayObj.day;
+  const status = getAttendanceStatus(dateIso);
+
+  // 색상 결정 규칙
+  let bgColorClass = 'bg-white';
+  let textColorClass = 'text-gray-900';
+  let shadowClass = '';
+  let ringClass = '';
+  let borderOverride = ''; // 소정근로일 전용 테두리
+
+  if (isScheduled) {
+    // 소정근로일 (흰색 배경 + 주황색 테두리)
+    if (status === 'ABSENT') {
+      bgColorClass = 'bg-red-50 hover:bg-red-100'; // 결근: 연한 빨강
+    } else if (status === 'ANNUAL_LEAVE') {
+      bgColorClass = 'bg-orange-100 hover:bg-orange-200'; // 연차: 연한 주황
+    } else {
+      bgColorClass = 'bg-white hover:bg-orange-50';
+    }
+    textColorClass = 'text-gray-900';
+    shadowClass = '';
+    ringClass = ''; // ring 제거하여 box-shadow 테두리가 보이도록
+    // box-shadow로 강력한 테두리 적용 (ring보다 우선)
+    borderOverride = 'scheduled-workday-border'; // 커스텀 클래스 사용
+  } else if (isWorkedDay) {
+    // 비소정근로일 실제 근무 (초록색 배경)
+    bgColorClass = 'bg-green-500 hover:bg-green-600';
+    textColorClass = 'text-white';
+    shadowClass = 'shadow-sm';
+  } else if (status === 'ABSENT') {
+    // 비소정근로일인데 결근 기록이 있는 경우 (특이 케이스)
+    bgColorClass = 'bg-red-50';
+    textColorClass = 'text-gray-400';
+  } else if (isWeeklyRest(dateIso)) {
+    // 주휴일
+    bgColorClass = 'bg-sky-50 hover:bg-sky-100';
+    textColorClass = 'text-sky-700';
+    ringClass = 'ring-1 ring-sky-100';
+  } else {
+    // 일반 날짜
+    bgColorClass = 'bg-white hover:bg-brand-50';
+  }
+
+  // 공휴일 스타일 (링 추가)
+  if (isHoliday(dateIso)) {
+    ringClass = 'ring-2 ring-red-200';
+  }
+
+  // 선택된 날짜 스타일 (최우선 색상 덮어쓰기 또는 링 추가)
+  // 여기서는 선택된 날짜를 강조하기 위해 브랜드 색상으로 덮어씀
+  if (isSelected) {
+    bgColorClass = 'bg-brand-600';
+    textColorClass = 'text-white';
+    shadowClass = 'shadow-md';
+    // 선택 시에도 소정근로일이면 주황색 테두리 유지
+    if (isScheduled) {
+      borderOverride = 'scheduled-workday-border';
+    }
+  }
+
+  return `${baseClass} ${borderOverride || borderClass} ${bgColorClass} ${textColorClass} ${shadowClass} ${ringClass}`;
+};
+
+// 출결 상태 가져오기
+const getAttendanceStatus = (dateIso?: string): string | null => {
+  if (!dateIso) return null;
+  return scheduledDayMap.value[dateIso]?.attendance_status || null;
+};
+
+// 출결 상태 한글 라벨
+const getAttendanceStatusLabel = (dateIso?: string): string => {
+  const status = getAttendanceStatus(dateIso);
+  if (!status) return '결근';
+  
+  const statusLabels: Record<string, string> = {
+    'REGULAR_WORK': '근무',
+    'ANNUAL_LEAVE': '연차',
+    'SICK_LEAVE': '병가',
+    'ABSENT': '결근',
+    'PERSONAL_LEAVE': '개인휴가',
+    'UNPAID_LEAVE': '무급휴가'
+  };
+  
+  return statusLabels[status] || '결근';
 };
 
 const cellTitle = (dateIso?: string, scheduled?: boolean): string => {
@@ -369,16 +634,29 @@ async function loadCalendar() {
     calendarAbortController = new AbortController()
     const reqId = ++calendarRequestSeq
     const monthStr = `${currentYear.value}-${String(currentMonth.value).padStart(2, '0')}`;
-    const res = await apiClient.get(`/labor/jobs/${employeeId}/monthly-schedule/`, {
+    
+    // Phase 3: calendar API 사용 (is_scheduled_workday, is_worked, attendance_status 포함)
+    const res = await apiClient.get(`/labor/jobs/${employeeId}/calendar/`, {
       params: { month: monthStr },
       signal: calendarAbortController.signal,
     });
     
     // 응답 데이터 구조 확인 및 할당
     // 응답 도착 시점에 최신 요청인지 확인
+    console.log('[WorkCalendar] Raw API response:', res.data);
+    console.log('[WorkCalendar] Request ID match:', reqId === calendarRequestSeq, 'reqId:', reqId, 'seq:', calendarRequestSeq);
+    
     if (reqId === calendarRequestSeq) {
       const responseData = res.data.dates || res.data;
       calendarData.value = Array.isArray(responseData) ? responseData : [];
+      console.log('[WorkCalendar] Calendar data assigned:', calendarData.value.length, 'items');
+      console.log('[WorkCalendar] First 3 items:', calendarData.value.slice(0, 3));
+      
+      // 🔥 핵심 수정: calendarData 변경 시 강제 리렌더링
+      calendarVersion.value++;
+      console.log('[WorkCalendar] calendarVersion incremented to:', calendarVersion.value);
+    } else {
+      console.warn('[WorkCalendar] Response discarded - stale request');
     }
     
     // 강제로 다음 틱에서 재렌더링 트리거
@@ -473,8 +751,8 @@ const nextMonth = () => {
   selectedDay.value = null;
 };
 
-function selectDate(day: number) {
-  if (day === 0) return;
+function selectDate(day: number | null) {
+  if (!day) return;
   const employeeId = activeJob?.value?.id;
   if (!employeeId) return;
 
@@ -510,24 +788,31 @@ async function loadWorkRecordForDate(employeeId: number, dateIso: string) {
     // API 응답 전체 확인
     console.log('[WorkCalendar] Full API response:', JSON.stringify(res.data));
     console.log('[WorkCalendar] work_record:', res.data.work_record);
-    console.log('[WorkCalendar] work_record type:', typeof res.data.work_record);
-    console.log('[WorkCalendar] has_schedule:', res.data.has_schedule);
+    console.log('[WorkCalendar] is_scheduled_workday:', res.data.is_scheduled_workday);
     
     // work_record가 있으면 사용, 없으면 스케줄 정보를 포함한 객체 생성
     if (res.data && res.data.work_record) {
-      modalRecord.value = res.data.work_record;
+      // Phase 3: 소정근로일 정보 추가
+      modalRecord.value = {
+        ...res.data.work_record,
+        is_scheduled_workday: res.data.is_scheduled_workday
+      };
       console.log('[WorkCalendar] Found work record:', modalRecord.value);
     } else if (res.data && res.data.has_schedule) {
       // 실제 근로기록은 없지만 스케줄이 있는 경우 스케줄 정보 전달
       modalRecord.value = {
         schedule_only: true,
         start_time: res.data.start_time,
-        end_time: res.data.end_time
+        end_time: res.data.end_time,
+        is_scheduled_workday: res.data.is_scheduled_workday  // Phase 3
       };
       console.log('[WorkCalendar] Found schedule for', dateIso, ':', modalRecord.value);
     } else {
-      modalRecord.value = null;
-      console.log('[WorkCalendar] No work record or schedule found for', dateIso);
+      // Phase 3: 스케줄이 없어도 소정근로일 정보는 전달
+      modalRecord.value = {
+        is_scheduled_workday: res.data.is_scheduled_workday
+      };
+      console.log('[WorkCalendar] No work record or schedule, but scheduled workday info:', res.data.is_scheduled_workday);
     }
   } catch (e) {
     console.error('[WorkCalendar] Failed to load work record', e);
@@ -559,6 +844,8 @@ async function onMonthlyScheduleSaved(data?: { stats?: any; dates?: any; cumulat
   if (data?.dates) {
     // 캘린더 날짜 데이터 업데이트
     calendarData.value = Array.isArray(data.dates) ? data.dates : []
+    // 🔥 핵심 수정: 강제 리렌더링
+    calendarVersion.value++
     
     // 업적 통계 업데이트 이벤트 발송
     emit('statsUpdated')
@@ -624,6 +911,8 @@ async function deleteMonthlyRecords() {
   }
 }
 
+const skipNextGlobalUpdate = ref(false)
+
 async function onModalSaved(responseData?: any) {
   modalVisible.value = false;
   modalRecord.value = null;
@@ -634,8 +923,15 @@ async function onModalSaved(responseData?: any) {
   // 응답 데이터에 최신 통계가 있으면 사용, 없으면 다시 로드
   if (responseData && responseData.dates && responseData.stats) {
     calendarData.value = responseData.dates;
+    // 🔥 핵심 수정: 강제 리렌더링
+    calendarVersion.value++;
     // 캘린더 데이터만 업데이트하고, 통계는 WorkSummaryCard에서 현재 월 기준으로 다시 로드
     emit('statsUpdated');
+    
+    // 🔥 Race Condition 방지: 방금 데이터를 업데이트했으므로, 
+    // 곧바로 이어질 labor-updated 이벤트에 의한 재로딩은 건너뜀
+    skipNextGlobalUpdate.value = true;
+    console.log('[WorkCalendar] Updated from save response, skipping next global reload');
   } else {
     await loadCalendar();
     emit('statsUpdated');
@@ -653,11 +949,14 @@ async function onModalDeleted(responseData?: any) {
   // 응답 데이터에 최신 통계가 있으면 사용, 없으면 다시 로드
   if (responseData && responseData.dates && responseData.stats) {
     console.log('[WorkCalendar] Using response data from delete');
-    console.log('[WorkCalendar] New dates:', responseData.dates);
-    console.log('[WorkCalendar] New stats:', responseData.stats);
     calendarData.value = responseData.dates;
+    // 🔥 핵심 수정: 강제 리렌더링
+    calendarVersion.value++;
     // 캘린더 데이터만 업데이트하고, 통계는 WorkSummaryCard에서 현재 월 기준으로 다시 로드
     emit('statsUpdated');
+    
+    // 🔥 Race Condition 방지
+    skipNextGlobalUpdate.value = true;
   } else {
     console.log('[WorkCalendar] No response data, reloading calendar');
     await loadCalendar();
@@ -667,6 +966,12 @@ async function onModalDeleted(responseData?: any) {
 
 // 전역 이벤트 리스너 - 스케줄 저장 시 캘린더 자동 갱신
 function handleLaborUpdate() {
+  if (skipNextGlobalUpdate.value) {
+    console.log('[WorkCalendar] Skipping redundant reload (handled by local update)');
+    skipNextGlobalUpdate.value = false;
+    return;
+  }
+  
   console.log('[WorkCalendar] Labor updated event received, reloading calendar');
   loadCalendar();
 }
@@ -690,5 +995,18 @@ defineExpose({
   background-color: #f97316 !important;
   color: white !important;
   font-weight: bold !important;
+}
+
+/* 소정근로일 테두리: box-shadow로 구현 (ring/border보다 우선순위 높음) */
+.scheduled-workday-border {
+  box-shadow: inset 0 0 0 2px #f97316 !important;
+  border: none !important;
+  /* ring 스타일 강제 제거 */
+}
+
+/* ring 클래스가 있어도 scheduled-workday-border가 우선 */
+.scheduled-workday-border.ring-1,
+.scheduled-workday-border.ring-2 {
+  box-shadow: inset 0 0 0 2px #f97316 !important;
 }
 </style>

@@ -55,8 +55,8 @@
 
         <!-- 자격 여부 메시지 -->
         <div v-if="!data.eligible" class="mt-3 pt-3 border-t border-gray-100">
-          <p class="text-xs text-gray-500 leading-tight">
-            ⚠️ 재직기간이 1년 미만이므로 퇴직금 지급 대상이 아닙니다.
+          <p class="text-xs text-red-500 leading-tight">
+            ⚠️ {{ data.calculation_details }}
           </p>
         </div>
       </div>

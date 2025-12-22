@@ -2,29 +2,70 @@
   <div class="space-y-4">
     <p class="text-sm text-gray-600">저장 시 캘린더 전체 근로시간이 변경돼요! 월별 및 일별 근로정보 변경은 캘린더에서 해주세요.</p>
     <div class="grid grid-cols-1 gap-3">
-      <div v-for="d in weekdays" :key="d.value" class="flex items-center gap-3">
-        <div class="w-20 text-sm font-medium">{{ d.label }}</div>
+      <div v-for="d in weekdays" :key="d.value" class="border rounded-lg p-3 bg-gray-50">
+        <div class="flex items-center gap-3 mb-2">
+          <div class="w-20 text-sm font-medium">{{ d.label }}</div>
+          
+          <!-- 시작 시간 Select -->
+          <TimeSelect
+            v-model="localSchedules[d.value].start_time" 
+            :options="timeOptions"
+            :disabled="!localSchedules[d.value].enabled"
+          />
+          
+          <span class="text-xs text-gray-400">~</span>
+          
+          <!-- 종료 시간 Select -->
+          <TimeSelect
+            v-model="localSchedules[d.value].end_time" 
+            :options="timeOptions"
+            :disabled="!localSchedules[d.value].enabled"
+          />
+          
+          <!-- 휴게시간 입력 -->
+          <div class="flex items-center gap-1">
+            <span class="text-xs text-gray-500">휴게</span>
+            <input
+              type="number"
+              v-model.number="localSchedules[d.value].break_minutes"
+              min="0"
+              max="480"
+              :disabled="!localSchedules[d.value].enabled"
+              class="w-16 px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-brand-500 disabled:bg-gray-100 disabled:text-gray-400"
+              placeholder="0"
+            />
+            <span class="text-xs text-gray-500">분</span>
+          </div>
+          
+          <label class="ml-2 inline-flex items-center gap-2 text-sm cursor-pointer select-none">
+            <input type="checkbox" v-model="localSchedules[d.value].enabled" class="rounded border-gray-300 text-brand-600 focus:ring-brand-500" /> 
+            <span :class="localSchedules[d.value].enabled ? 'text-gray-900' : 'text-gray-400'">일하는 날</span>
+          </label>
+        </div>
         
-        <!-- 시작 시간 Select -->
-        <TimeSelect
-          v-model="localSchedules[d.value].start_time" 
-          :options="timeOptions"
-          :disabled="!localSchedules[d.value].enabled"
-        />
-        
-        <span class="text-xs text-gray-400">~</span>
-        
-        <!-- 종료 시간 Select -->
-        <TimeSelect
-          v-model="localSchedules[d.value].end_time" 
-          :options="timeOptions"
-          :disabled="!localSchedules[d.value].enabled"
-        />
-        
-        <label class="ml-2 inline-flex items-center gap-2 text-sm cursor-pointer select-none">
-          <input type="checkbox" v-model="localSchedules[d.value].enabled" class="rounded border-gray-300 text-brand-600 focus:ring-brand-500" /> 
-          <span :class="localSchedules[d.value].enabled ? 'text-gray-900' : 'text-gray-400'">일하는 날</span>
-        </label>
+        <!-- 익일 근무 입력 섹션 -->
+        <div v-if="localSchedules[d.value].enabled" class="ml-24 flex items-center gap-3">
+          <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
+            <input 
+              type="checkbox" 
+              v-model="localSchedules[d.value].has_next_day_work"
+              class="rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+            />
+            <span class="text-gray-700">익일 근무 있음 (24:00~06:00)</span>
+          </label>
+          
+          <div v-if="localSchedules[d.value].has_next_day_work" class="flex items-center gap-2">
+            <input
+              type="number"
+              v-model.number="localSchedules[d.value].next_day_work_minutes"
+              min="0"
+              max="360"
+              class="w-20 px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-brand-500"
+              placeholder="0"
+            />
+            <span class="text-xs text-gray-600">분 (0~360)</span>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -47,7 +88,7 @@ const weekdays = [
   { value: 6, label: '일' },
 ]
 
-// 00:00 ~ 23:30까지 30분 단위 시간 옵션 생성
+// 00:00 ~ 24:00까지 30분 단위 시간 옵션 생성
 const timeOptions = computed(() => {
   const options = []
   for (let h = 0; h < 24; h++) {
@@ -55,17 +96,25 @@ const timeOptions = computed(() => {
     options.push(`${hh}:00`)
     options.push(`${hh}:30`)
   }
+  options.push('24:00')  // 24:00 추가
   return options
 })
 
-const localSchedules = reactive<Record<number, { start_time: string | null, end_time: string | null, enabled: boolean }>>({
-  0: { start_time: null, end_time: null, enabled: false },
-  1: { start_time: null, end_time: null, enabled: false },
-  2: { start_time: null, end_time: null, enabled: false },
-  3: { start_time: null, end_time: null, enabled: false },
-  4: { start_time: null, end_time: null, enabled: false },
-  5: { start_time: null, end_time: null, enabled: false },
-  6: { start_time: null, end_time: null, enabled: false },
+const localSchedules = reactive<Record<number, { 
+  start_time: string | null, 
+  end_time: string | null, 
+  enabled: boolean,
+  has_next_day_work: boolean,
+  next_day_work_minutes: number,
+  break_minutes: number
+}>>({
+  0: { start_time: null, end_time: null, enabled: false, has_next_day_work: false, next_day_work_minutes: 0, break_minutes: 0 },
+  1: { start_time: null, end_time: null, enabled: false, has_next_day_work: false, next_day_work_minutes: 0, break_minutes: 0 },
+  2: { start_time: null, end_time: null, enabled: false, has_next_day_work: false, next_day_work_minutes: 0, break_minutes: 0 },
+  3: { start_time: null, end_time: null, enabled: false, has_next_day_work: false, next_day_work_minutes: 0, break_minutes: 0 },
+  4: { start_time: null, end_time: null, enabled: false, has_next_day_work: false, next_day_work_minutes: 0, break_minutes: 0 },
+  5: { start_time: null, end_time: null, enabled: false, has_next_day_work: false, next_day_work_minutes: 0, break_minutes: 0 },
+  6: { start_time: null, end_time: null, enabled: false, has_next_day_work: false, next_day_work_minutes: 0, break_minutes: 0 },
 })
 
 /**
@@ -113,10 +162,17 @@ async function loadSchedules() {
       const roundedStart = roundToNearest30(s.start_time)
       const roundedEnd = roundToNearest30(s.end_time)
       
+      // 익일 근무 데이터 로드
+      const nextDayMinutes = s.next_day_work_minutes || 0
+      const breakMinutes = s.break_minutes || 0
+      
       localSchedules[idx] = { 
         start_time: roundedStart, 
         end_time: roundedEnd, 
-        enabled: !!s.enabled 
+        enabled: !!s.enabled,
+        has_next_day_work: nextDayMinutes > 0,
+        next_day_work_minutes: nextDayMinutes,
+        break_minutes: breakMinutes
       }
     }
   } catch (e) {
@@ -124,17 +180,24 @@ async function loadSchedules() {
   }
 }
 
-type ScheduleState = Record<number, { start_time: string | null, end_time: string | null, enabled: boolean }>
+type ScheduleState = Record<number, { 
+  start_time: string | null, 
+  end_time: string | null, 
+  enabled: boolean,
+  has_next_day_work: boolean,
+  next_day_work_minutes: number,
+  break_minutes: number
+}>
 
 function cloneSchedules(source?: ScheduleState | null): ScheduleState {
   const target: ScheduleState = {
-    0: { start_time: null, end_time: null, enabled: false },
-    1: { start_time: null, end_time: null, enabled: false },
-    2: { start_time: null, end_time: null, enabled: false },
-    3: { start_time: null, end_time: null, enabled: false },
-    4: { start_time: null, end_time: null, enabled: false },
-    5: { start_time: null, end_time: null, enabled: false },
-    6: { start_time: null, end_time: null, enabled: false },
+    0: { start_time: null, end_time: null, enabled: false, has_next_day_work: false, next_day_work_minutes: 0, break_minutes: 0 },
+    1: { start_time: null, end_time: null, enabled: false, has_next_day_work: false, next_day_work_minutes: 0, break_minutes: 0 },
+    2: { start_time: null, end_time: null, enabled: false, has_next_day_work: false, next_day_work_minutes: 0, break_minutes: 0 },
+    3: { start_time: null, end_time: null, enabled: false, has_next_day_work: false, next_day_work_minutes: 0, break_minutes: 0 },
+    4: { start_time: null, end_time: null, enabled: false, has_next_day_work: false, next_day_work_minutes: 0, break_minutes: 0 },
+    5: { start_time: null, end_time: null, enabled: false, has_next_day_work: false, next_day_work_minutes: 0, break_minutes: 0 },
+    6: { start_time: null, end_time: null, enabled: false, has_next_day_work: false, next_day_work_minutes: 0, break_minutes: 0 },
   }
   const src = source || localSchedules
   weekdays.forEach(w => {
@@ -143,6 +206,9 @@ function cloneSchedules(source?: ScheduleState | null): ScheduleState {
       start_time: data?.start_time ?? null,
       end_time: data?.end_time ?? null,
       enabled: !!data?.enabled,
+      has_next_day_work: !!data?.has_next_day_work,
+      next_day_work_minutes: data?.next_day_work_minutes ?? 0,
+      break_minutes: data?.break_minutes ?? 0,
     }
   })
   return target
@@ -160,10 +226,40 @@ async function saveSchedules(options?: { schedules?: ScheduleState, employeeId?:
   try {
     const requests = weekdays.map(w => {
       const schedule = scheduleSource[w.value];
+      
+      // 24:00 처리: 다음날 00:00으로 변환
+      let startTime = schedule.start_time;
+      let endTime = schedule.end_time;
+      let isOvernight = false;
+      
+      if (endTime === '24:00') {
+        endTime = '00:00';
+        isOvernight = true;
+      }
+      
+      // 익일 근무 시간 처리
+      const nextDayMinutes = schedule.has_next_day_work ? (schedule.next_day_work_minutes || 0) : 0;
+      
+      // 휴게시간 처리
+      const breakMinutes = schedule.break_minutes || 0;
+      
+      // 밸리데이션: 0~360 범위 체크
+      if (nextDayMinutes < 0 || nextDayMinutes > 360) {
+        throw new Error(`익일 근무 시간은 0~360분 사이여야 합니다. (현재: ${nextDayMinutes}분)`);
+      }
+      
+      // 밸리데이션: 휴게시간 범위 체크
+      if (breakMinutes < 0 || breakMinutes > 480) {
+        throw new Error(`휴게시간은 0~480분 사이여야 합니다. (현재: ${breakMinutes}분)`);
+      }
+      
       const payload = {
         weekday: w.value,
-        start_time: schedule.enabled ? schedule.start_time : null,
-        end_time: schedule.enabled ? schedule.end_time : null,
+        start_time: schedule.enabled ? startTime : null,
+        end_time: schedule.enabled ? endTime : null,
+        is_overnight: isOvernight,
+        next_day_work_minutes: nextDayMinutes,
+        break_minutes: breakMinutes,
         enabled: schedule.enabled,
       };
       return apiClient.post(`/labor/jobs/${targetEmployeeId}/schedules/`, payload);
@@ -194,9 +290,13 @@ async function saveSchedules(options?: { schedules?: ScheduleState, employeeId?:
 
 function resetSchedules() {
   for (const k of Object.keys(localSchedules)) {
-    localSchedules[parseInt(k)].start_time = null
-    localSchedules[parseInt(k)].end_time = null
-    localSchedules[parseInt(k)].enabled = false
+    const idx = parseInt(k)
+    localSchedules[idx].start_time = null
+    localSchedules[idx].end_time = null
+    localSchedules[idx].enabled = false
+    localSchedules[idx].has_next_day_work = false
+    localSchedules[idx].next_day_work_minutes = 0
+    localSchedules[idx].break_minutes = 0
   }
 }
 
