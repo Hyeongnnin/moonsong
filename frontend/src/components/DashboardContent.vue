@@ -1,5 +1,5 @@
 <template>
-  <div class="bg-white rounded-lg border border-gray-200 p-6 h-full overflow-auto">
+  <div class="bg-white rounded-lg border border-gray-200 p-6">
     <div class="max-w-4xl mx-auto">
       <!-- 현재 선택된 알바 정보 표시 (헤더) -->
       <div v-if="activeJob" class="mb-6 pb-4 border-b border-gray-200">
@@ -16,18 +16,21 @@
         </div>
       </div>
 
-      <div class="grid lg:grid-cols-3 gap-6">
-        <div class="lg:col-span-2">
+      <div class="grid lg:grid-cols-3 gap-6 lg:grid-rows-[auto_1fr]">
+        <div class="lg:col-span-2 lg:row-span-2 flex flex-col gap-6">
           <WorkCalendar 
+            ref="workCalendarRef"
             :activeJob="activeJob" 
             @statsUpdated="handleStatsUpdate"
             @monthChanged="handleMonthChanged" 
           />
-          <!-- 캘린더 아래 연차휴가 카드 -->
-          <LaborAnnualLeaveCard />
+          <!-- 캘린더 아래 연차휴가 카드 - 우측 하단 카드와 bottom 정렬 -->
+          <div class="flex-1 min-h-0">
+            <LaborAnnualLeaveCard class="h-full" />
+          </div>
         </div>
 
-        <div class="lg:col-span-1">
+        <div class="lg:col-span-1 lg:row-span-1">
           <WorkSummaryCard 
             ref="summaryCardRef" 
             :activeJob="activeJob" 
@@ -35,44 +38,11 @@
             :displayMonth="selectedMonth"
           />
         </div>
-      </div>
 
-      <div class="mt-6">
-        <div class="grid md:grid-cols-2 gap-6">
-          <div class="bg-white rounded-lg border border-gray-200 p-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">편의기능</h3>
-            <div class="space-y-3">
-              <button class="w-full text-left p-4 bg-gray-50 rounded-lg hover:bg-brand-50 hover:border-brand-200 border border-gray-200 transition-colors">
-                <p class="text-sm font-semibold text-gray-900">근로계약서 관리</p>
-                <p class="text-xs text-gray-500 mt-1">계약서 업로드 및 확인</p>
-              </button>
-              <button class="w-full text-left p-4 bg-gray-50 rounded-lg hover:bg-brand-50 hover:border-brand-200 border border-gray-200 transition-colors">
-                <p class="text-sm font-semibold text-gray-900">급여 명세서</p>
-                <p class="text-xs text-gray-500 mt-1">월별 급여 내역 조회</p>
-              </button>
-              <button class="w-full text-left p-4 bg-gray-50 rounded-lg hover:bg-brand-50 hover:border-brand-200 border border-gray-200 transition-colors">
-                <p class="text-sm font-semibold text-gray-900">진단 결과</p>
-                <p class="text-xs text-gray-500 mt-1">근로환경 진단 결과 보기</p>
-              </button>
-            </div>
-          </div>
-
-          <div class="bg-white rounded-lg border border-gray-200 p-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">고객센터</h3>
-            <div class="space-y-3 mb-4">
-              <div class="border-b border-gray-200 pb-3">
-                <p class="text-sm font-medium text-gray-900">근로시간은 어떻게 기록하나요?</p>
-                <p class="text-xs text-gray-500 mt-2">매일 출퇴근 시간을 기록하시면 자동으로 계산됩니다.</p>
-              </div>
-              <div class="border-b border-gray-200 pb-3">
-                <p class="text-sm font-medium text-gray-900">상담 신청은 어떻게 하나요?</p>
-                <p class="text-xs text-gray-500 mt-2">상담 신청 페이지에서 원하는 주제를 선택하면 됩니다.</p>
-              </div>
-            </div>
-            <button class="w-full bg-brand-600 text-white py-2 rounded-lg font-medium hover:bg-brand-700 transition-colors text-sm">
-              더 많은 FAQ 보기
-            </button>
-          </div>
+        <div class="lg:col-span-1 lg:row-span-1 flex flex-col gap-6">
+          <!-- 주휴수당 및 퇴직금 카드 (우측 사이드바에서 이동) -->
+          <HolidayPayCard ref="holidayPayCardRef" :activeJob="activeJob" />
+          <RetirementPayCard :activeJob="activeJob" />
         </div>
       </div>
     </div>
@@ -80,18 +50,48 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import WorkCalendar from './WorkCalendar.vue';
 import LaborAnnualLeaveCard from './LaborAnnualLeaveCard.vue';
 import WorkSummaryCard from './WorkSummaryCard.vue';
+import HolidayPayCard from './HolidayPayCard.vue';
+import RetirementPayCard from './RetirementPayCard.vue';
 import { useJob, type Job } from '../stores/jobStore';
 
 const { activeJob } = useJob();
 const summaryCardRef = ref<InstanceType<typeof WorkSummaryCard> | null>(null);
+const holidayPayCardRef = ref<InstanceType<typeof HolidayPayCard> | null>(null);
+const workCalendarRef = ref<InstanceType<typeof WorkCalendar> | null>(null);
 
 // 캘린더에서 선택된 연/월을 추적
 const selectedYear = ref<number | undefined>(undefined);
 const selectedMonth = ref<number | undefined>(undefined);
+
+// labor-updated 이벤트 핸들러
+function handleLaborUpdate(event?: CustomEvent) {
+  // 이벤트에 통계 데이터가 포함되어 있으면 사용
+  if (event?.detail?.stats) {
+    handleStatsUpdate(event.detail.stats);
+  }
+  
+  // 캘린더 새로고침
+  if (workCalendarRef.value) {
+    workCalendarRef.value.refreshCalendar();
+  }
+  
+  // 주휴수당 갱신
+  if (holidayPayCardRef.value) {
+    holidayPayCardRef.value.refresh();
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('labor-updated', handleLaborUpdate);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('labor-updated', handleLaborUpdate);
+});
 
 // 함수: 시급 포맷팅
 function formatWage(wage: number | string): string {

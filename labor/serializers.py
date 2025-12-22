@@ -5,6 +5,17 @@ from decimal import Decimal
 from .models import Employee, WorkRecord, CalculationResult, WorkSchedule, MonthlySchedule
 
 
+class AnnualLeaveSummarySerializer(serializers.Serializer):
+    """연차 요약 정보"""
+    as_of = serializers.DateField(help_text="기준일")
+    earned_days = serializers.DecimalField(max_digits=4, decimal_places=1, help_text="발생 연차")
+    used_days = serializers.DecimalField(max_digits=4, decimal_places=1, help_text="사용 연차")
+    remaining_days = serializers.DecimalField(max_digits=4, decimal_places=1, help_text="잔여 연차")
+    rule_version = serializers.CharField(help_text="적용 규칙 버전")
+    is_eligible = serializers.BooleanField(help_text="연차 발생 대상 여부")
+    reason = serializers.CharField(help_text="부적격 사유 (적격시 빈 문자열)", allow_blank=True)
+
+
 class WorkRecordSerializer(serializers.ModelSerializer):
     total_hours = serializers.SerializerMethodField()
 
@@ -12,6 +23,8 @@ class WorkRecordSerializer(serializers.ModelSerializer):
         model = WorkRecord
         fields = [
             'id', 'employee', 'work_date', 'time_in', 'time_out', 'break_minutes',
+            'break_start', 'break_end', 'break_intervals',
+            'day_type', 'attendance_type',
             'total_hours', 'is_overtime', 'is_night', 'is_holiday'
         ]
 
@@ -49,7 +62,11 @@ class MonthlyScheduleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = MonthlySchedule
-        fields = ['id', 'year', 'month', 'weekday', 'weekday_display', 'start_time', 'end_time', 'enabled']
+        fields = [
+            'id', 'year', 'month', 'weekday', 'weekday_display',
+            'start_time', 'end_time', 'enabled',
+            'default_break_minutes_by_weekday', 'weekly_rest_day'
+        ]
 
     def get_weekday_display(self, obj):
         return obj.get_weekday_display()
@@ -62,8 +79,8 @@ class EmployeeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Employee
         fields = [
-            'id', 'workplace_name', 'workplace_address', 'workplace_reg_no',
-            'industry', 'employment_type', 'start_date', 'end_date',
+            'id', 'workplace_name', 'workplace_reg_no',
+            'employment_type', 'start_date',
             'hourly_rate',
             'attendance_rate_last_year', 'total_wage_last_3m', 'total_days_last_3m',
             'work_records', 'schedules'
@@ -77,8 +94,8 @@ class EmployeeUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Employee
         fields = [
-            'workplace_name', 'workplace_address', 'workplace_reg_no',
-            'industry', 'employment_type', 'start_date', 'end_date',
+            'workplace_name', 'workplace_reg_no',
+            'employment_type', 'start_date',
             'hourly_rate',
             'attendance_rate_last_year', 'total_wage_last_3m', 'total_days_last_3m'
         ]
@@ -88,24 +105,6 @@ class EmployeeUpdateSerializer(serializers.ModelSerializer):
         if value < 0:
             raise serializers.ValidationError("시급은 0 이상이어야 합니다.")
         return value
-
-    def validate(self, data):
-        """전체 유효성 검사"""
-        start_date = data.get('start_date')
-        end_date = data.get('end_date')
-
-        # 인스턴스가 있으면 기존 값 사용
-        if self.instance:
-            start_date = start_date or self.instance.start_date
-            end_date = end_date or self.instance.end_date
-
-        # end_date가 start_date보다 이전이면 안됨
-        if end_date and start_date and end_date < start_date:
-            raise serializers.ValidationError(
-                {"end_date": "종료일은 시작일 이후여야 합니다."}
-            )
-
-        return data
 
 
 class CalculationResultSerializer(serializers.ModelSerializer):

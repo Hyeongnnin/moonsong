@@ -88,6 +88,7 @@
         </div>
 
         <div class="flex flex-wrap gap-2 mt-auto">
+          <button v-if="d.file_url" @click.prevent="openPreview(d)" class="px-3 py-2 text-sm bg-brand-600 text-white rounded hover:bg-brand-700">미리보기</button>
           <button v-if="d.file_url" @click.prevent="openDownload(d.file_url)" class="flex-1 px-3 py-2 text-sm border rounded hover:bg-gray-50">다운로드</button>
           <button @click="onEdit(d)" class="px-3 py-2 text-sm border rounded hover:bg-gray-50">수정</button>
           <button @click="onDelete(d)" class="px-3 py-2 text-sm border border-red-200 text-red-700 rounded hover:bg-red-50">삭제</button>
@@ -144,6 +145,91 @@
     </div>
   </div>
 
+  <!-- 미리보기 모달 (격리된 Viewer) -->
+  <Teleport to="body">
+    <div 
+      v-if="showPreviewModal" 
+      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4"
+      @click.self="closePreviewModal"
+    >
+      <div class="bg-white rounded-lg shadow-xl w-full max-w-[95vw] max-h-[95vh] flex flex-col">
+        <!-- 헤더 -->
+        <div class="flex items-center justify-between p-4 border-b">
+          <div>
+            <h3 class="text-lg font-semibold">{{ previewDoc?.title || '서류 미리보기' }}</h3>
+            <p class="text-xs text-gray-500">{{ getTemplateName(previewDoc!) }} · {{ getDocType(previewDoc!) }}</p>
+          </div>
+          <button @click="closePreviewModal" class="text-gray-500 hover:text-gray-700">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        
+        <!-- 스크롤 가능한 뷰어 컨테이너 (100% 격리) -->
+        <div class="flex-1 overflow-auto bg-gray-100">
+          <div class="p-6">
+            <!-- PDF 파일이 있는 경우 iframe으로 표시 -->
+            <div v-if="previewDoc?.file_url" class="viewer-container">
+              <iframe 
+                :src="resolveFileUrl(previewDoc.file_url)" 
+                class="preview-iframe"
+                frameborder="0"
+              />
+            </div>
+            <!-- 파일이 없는 경우 정보만 표시 -->
+            <div v-else class="preview-sheet">
+              <div class="preview-content">
+                <div class="text-center mb-6">
+                  <h1 class="text-3xl font-bold">{{ previewDoc?.title || '제목 없음' }}</h1>
+                  <p class="text-sm text-gray-600 mt-2">{{ getTemplateName(previewDoc!) }}</p>
+                </div>
+                
+                <div class="space-y-4 text-sm">
+                  <div class="border border-gray-300 p-4 rounded bg-yellow-50">
+                    <p class="font-medium mb-2">⚠️ 파일이 첨부되지 않았습니다</p>
+                    <p class="text-gray-700">
+                      이 서류에는 아직 파일이 업로드되지 않았습니다. 
+                      수정 버튼을 눌러 PDF 파일을 업로드해주세요.
+                    </p>
+                  </div>
+
+                  <div class="border border-gray-300 p-4 rounded">
+                    <p class="font-medium mb-2">서류 정보</p>
+                    <ul class="list-disc list-inside space-y-1 text-gray-700">
+                      <li>제목: {{ previewDoc?.title || '제목 없음' }}</li>
+                      <li>템플릿: {{ getTemplateName(previewDoc!) }}</li>
+                      <li>문서 유형: {{ getDocType(previewDoc!) }}</li>
+                      <li>상태: {{ previewDoc?.status || '작성중' }}</li>
+                      <li>생성일: {{ formatDate(previewDoc?.created_at) }}</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 하단 버튼 -->
+        <div class="p-4 border-t bg-gray-50 flex justify-end gap-2">
+          <button 
+            @click="closePreviewModal" 
+            class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+          >
+            닫기
+          </button>
+          <button 
+            v-if="previewDoc?.file_url"
+            @click="openDownload(previewDoc.file_url)" 
+            class="px-4 py-2 bg-brand-600 text-white rounded hover:bg-brand-700"
+          >
+            다운로드
+          </button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
   <!-- Toast -->
   <div v-if="toast.message" :class="['fixed bottom-6 right-6 p-3 rounded shadow-lg text-white', toast.type === 'success' ? 'bg-green-600' : (toast.type === 'error' ? 'bg-red-600' : 'bg-gray-800')]">
     {{ toast.message }}
@@ -165,6 +251,10 @@ const editForm = ref({ title: '', status: '작성중', template: '' })
 const editFileRef = ref<File | null>(null)
 const editFileName = ref('')
 const toast = ref({ message: '', type: '' })
+
+// 미리보기 관련 상태
+const showPreviewModal = ref(false)
+const previewDoc = ref<GeneratedDocument | null>(null)
 
 const search = ref('')
 const statusFilter = ref<'all' | string>('all')
@@ -363,7 +453,76 @@ function showToast(message: string, type = 'info') {
     toast.value.type = ''
   }, 3000)
 }
+
+function openPreview(d: GeneratedDocument) {
+  previewDoc.value = d
+  showPreviewModal.value = true
+}
+
+function closePreviewModal() {
+  showPreviewModal.value = false
+  previewDoc.value = null
+}
+
+// 부모 컴포넌트에서 호출할 수 있도록 expose
+defineExpose({
+  reload
+})
 </script>
 
 <style scoped>
+/* 격리된 뷰어 컨테이너 */
+.viewer-container {
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  overflow: visible;
+}
+
+/* PDF iframe */
+.preview-iframe {
+  width: 210mm;
+  min-height: 297mm;
+  background: white;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
+}
+
+/* A4 크기 미리보기 시트 */
+.preview-sheet {
+  width: 210mm;
+  min-height: 297mm;
+  background: white;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
+  margin: 0 auto;
+}
+
+.preview-content {
+  padding: 20mm;
+}
+
+/* 반응형: 작은 화면에서는 축소 */
+@media (max-width: 900px) {
+  .preview-iframe,
+  .preview-sheet {
+    width: 100%;
+    min-width: 280px;
+  }
+  
+  .preview-content {
+    padding: 16px;
+  }
+}
+
+/* 브랜드 색상 */
+.bg-brand-600 {
+  background-color: #DE5D35;
+}
+
+.hover\:bg-brand-700:hover {
+  background-color: #c54d28;
+}
 </style>

@@ -47,23 +47,98 @@ apiClient.interceptors.request.use((config) => {
 });
 
 // 응답 인터셉터: 401 발생 시 토큰 제거 및 로그인 페이지로 리다이렉트
+let isRefreshing = false;
+let pendingQueue: Array<(token: string | null) => void> = [];
+
+function onRefreshed(token: string | null) {
+  pendingQueue.forEach((cb) => cb(token));
+  pendingQueue = [];
+}
+
 apiClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
+  (response) => {
+    try {
+      const method = (response.config.method || '').toUpperCase();
+      const url = response.config.url || '';
+      // 근로기록 저장/수정/삭제 및 월 스케줄 저장 후 갱신 이벤트 발생
+      const isMutating = method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE';
+      if (isMutating) {
+        const u = url.replace(apiBaseUrl, '');
+        const isWorkRecord = /\/labor\/work-records\/?/.test(u);
+        const isJobSchedules = /\/labor\/jobs\/\d+\/(schedules|monthly-schedule-override|monthly-schedule|monthly-work-records)\/?/.test(u);
+        if ((isWorkRecord || isJobSchedules) && typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('labor-updated'));
+        }
+      }
+    } catch (_) {
+      // ignore
+    }
+    return response;
+  },
+  async (error) => {
     const status = error?.response?.status;
-    if (status === 401) {
+    const originalRequest = error?.config || {};
+    if (typeof window !== 'undefined') {
+      console.error('[api] error response', status, error?.response?.data || error?.message);
+    }
+
+    // 401 처리: refresh 토큰으로 갱신 시도 후 1회 재시도
+    if (status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
       try {
-        localStorage.removeItem('access');
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh');
-        localStorage.removeItem('token');
-        localStorage.removeItem('auth');
-      } catch (e) {}
-      // redirect to login page (force full reload to clear app state)
-      if (typeof window !== 'undefined') {
-        window.location.href = '/login';
+        const refresh = localStorage.getItem('refresh');
+        if (!refresh) throw new Error('no-refresh');
+
+        if (isRefreshing) {
+          // 다른 요청이 갱신 중이면 큐에 대기 후 재시도
+          return new Promise((resolve, reject) => {
+            pendingQueue.push((newToken) => {
+              if (!newToken) {
+                reject(error);
+                return;
+              }
+              try {
+                originalRequest.headers = originalRequest.headers || {};
+                originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
+                resolve(apiClient(originalRequest));
+              } catch (e) {
+                reject(e);
+              }
+            });
+          });
+        }
+
+        isRefreshing = true;
+        const refreshRes = await axios.post(`${apiBaseUrl}/accounts/token/refresh/`, { refresh });
+        const newAccess = refreshRes.data?.access as string | undefined;
+        if (!newAccess) throw new Error('no-access');
+        // 저장 및 기본 헤더 갱신
+        localStorage.setItem('access', newAccess);
+        apiClient.defaults.headers.common['Authorization'] = `Bearer ${newAccess}`;
+        onRefreshed(newAccess);
+        // 원 요청 재시도
+        originalRequest.headers = originalRequest.headers || {};
+        originalRequest.headers['Authorization'] = `Bearer ${newAccess}`;
+        return apiClient(originalRequest);
+      } catch (refreshErr) {
+        // 갱신 실패: 토큰 정리 후 로그인 페이지로
+        try {
+          localStorage.removeItem('access');
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('refresh');
+          localStorage.removeItem('token');
+          localStorage.removeItem('auth');
+        } catch (e) { }
+        onRefreshed(null);
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
+        }
+        return Promise.reject(refreshErr);
+      } finally {
+        isRefreshing = false;
       }
     }
+
     return Promise.reject(error);
   }
 );
@@ -198,11 +273,11 @@ export interface ResumePayload {
   status?: string;
 }
 
-export async function generateResumeDocx(payload: ResumePayload): Promise<{ 
-  blob: Blob; 
-  filename: string; 
-  saved: boolean; 
-  url?: string 
+export async function generateResumeDocx(payload: ResumePayload): Promise<{
+  blob: Blob;
+  filename: string;
+  saved: boolean;
+  url?: string
 }> {
   const res = await apiClient.post(`/documents/resume/generate/`, payload, {
     responseType: 'blob',
@@ -214,4 +289,22 @@ export async function generateResumeDocx(payload: ResumePayload): Promise<{
   const saved = res.headers['x-document-saved'] === 'true';
   const url = res.headers['x-document-url'];
   return { blob: res.data as Blob, filename, saved, url };
+}
+
+// ===================================================================
+// AI 상담 API
+// ===================================================================
+
+export interface AiConsultationResponse {
+  consultation_id: number;
+  answer: string;
+}
+
+export async function aiConsult(content: string, title?: string, category?: string): Promise<AiConsultationResponse> {
+  const response = await apiClient.post<AiConsultationResponse>("/consultations/ai-consult/", {
+    title,
+    content,
+    category,
+  });
+  return response.data;
 }

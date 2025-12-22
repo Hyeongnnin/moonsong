@@ -97,3 +97,32 @@ class ChangePasswordView(APIView):
         user.set_password(new_password)
         user.save()
         return Response({'detail': '비밀번호가 변경되었습니다.'})
+
+
+class LogoutView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        """
+        로그아웃: refresh 토큰을 블랙리스트에 추가
+        simplejwt의 토큰 블랙리스트 기능을 사용하려면 설치 필요
+        없으면 클라이언트에서만 토큰 삭제
+        """
+        try:
+            # simplejwt 블랙리스트 기능 사용 시
+            from rest_framework_simplejwt.tokens import RefreshToken
+            
+            refresh_token = request.data.get('refresh')
+            if refresh_token:
+                token = RefreshToken(refresh_token)
+                token.blacklist()
+                return Response({'detail': '로그아웃 되었습니다.'}, status=status.HTTP_200_OK)
+            else:
+                # refresh 토큰이 없어도 성공으로 처리 (클라이언트에서 토큰 삭제만)
+                return Response({'detail': '로그아웃 되었습니다.'}, status=status.HTTP_200_OK)
+        except ImportError:
+            # 블랙리스트 기능이 없으면 클라이언트에서만 토큰 삭제
+            return Response({'detail': '로그아웃 되었습니다.'}, status=status.HTTP_200_OK)
+        except Exception as e:
+            # 토큰이 유효하지 않거나 이미 블랙리스트에 있는 경우
+            return Response({'detail': '로그아웃 되었습니다.'}, status=status.HTTP_200_OK)

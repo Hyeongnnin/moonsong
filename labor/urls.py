@@ -1,6 +1,13 @@
 # labor/urls.py
+from django.urls import path
 from rest_framework.routers import DefaultRouter
-from .views import EmployeeViewSet, WorkRecordViewSet, CalculationResultViewSet
+from .views import (
+    EmployeeViewSet,
+    WorkRecordViewSet,
+    CalculationResultViewSet,
+    annual_leave_summary,
+    holidays,
+)
 
 router = DefaultRouter()
 # Job (Employee) 관련 엔드포인트
@@ -17,4 +24,7 @@ router.register("calculation-results", CalculationResultViewSet, basename="calcu
 # 호환성을 위해 employees도 유지
 router.register("employees", EmployeeViewSet, basename="employee")
 
-urlpatterns = router.urls
+urlpatterns = [
+    path('leave/annual/summary/', annual_leave_summary, name='annual-leave-summary'),
+    path('holidays/', holidays, name='holidays'),
+] + router.urls

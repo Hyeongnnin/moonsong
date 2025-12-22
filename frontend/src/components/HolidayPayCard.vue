@@ -71,7 +71,7 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import { apiClient } from '../api';
 import type { Job } from '../stores/jobStore';
 
@@ -80,6 +80,7 @@ const props = defineProps<{
 }>();
 
 const router = useRouter();
+const route = useRoute();
 const loading = ref(false);
 const error = ref(false);
 const result = ref({
@@ -118,8 +119,12 @@ const formatDateRange = (start: string, end: string) => {
 
 // 근로정보 입력 페이지로 이동
 function navigateToJobCreate() {
-  // MainLayout의 "근로정보 수정" 탭으로 이동
-  router.push('/dashboard?section=profile-edit');
+  // 이미 동일 경로/섹션이면 이벤트로 강제 전환
+  if (route.path === '/dashboard' && route.query.section === 'profile-edit') {
+    window.dispatchEvent(new CustomEvent('go-section', { detail: 'profile-edit' }));
+    return;
+  }
+  router.push('/dashboard?section=profile-edit').catch(() => {});
 }
 
 const fetchHolidayPay = async () => {

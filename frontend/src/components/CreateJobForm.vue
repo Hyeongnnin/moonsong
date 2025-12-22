@@ -7,14 +7,6 @@
         <input v-model="form.workplace_name" required class="w-full px-3 py-2 border rounded" />
       </div>
       <div>
-        <label class="block text-sm font-medium mb-1">사업장 주소</label>
-        <input v-model="form.workplace_address" class="w-full px-3 py-2 border rounded" />
-      </div>
-      <div>
-        <label class="block text-sm font-medium mb-1">업종</label>
-        <input v-model="form.industry" class="w-full px-3 py-2 border rounded" />
-      </div>
-      <div>
         <label class="block text-sm font-medium mb-1">고용형태</label>
         <select v-model="form.employment_type" class="w-full px-3 py-2 border rounded">
           <option value="">-- 선택 --</option>
@@ -36,15 +28,23 @@
         <input v-model.number="form.daily_hours" type="number" class="w-full px-3 py-2 border rounded" />
       </div>
 
-      <!-- 근로 시작일 / 종료일 추가 -->
+      <!-- 근로 시작일 -->
       <div>
         <label class="block text-sm font-medium mb-1">근로 시작일 <span class="text-red-500">*</span></label>
         <input v-model="form.start_date" type="date" required class="w-full px-3 py-2 border rounded" />
       </div>
-      <div>
-        <label class="block text-sm font-medium mb-1">근로 종료일</label>
-        <input v-model="form.end_date" type="date" class="w-full px-3 py-2 border rounded" />
-        <p class="text-xs text-gray-500 mt-1">현재 재직 중이면 비워두세요.</p>
+
+      <!-- 근로 스케줄 안내 -->
+      <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+        <div class="flex items-start gap-2">
+          <svg class="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+          </svg>
+          <div class="text-sm text-blue-800">
+            <p class="font-medium mb-1">💡 근로 스케줄은 어디서 설정하나요?</p>
+            <p class="text-blue-700">알바 등록 후 <span class="font-semibold">근로정보 수정 → 주간 근무 스케줄</span>에서 요일별 근무 시간을 설정할 수 있습니다.</p>
+          </div>
+        </div>
       </div>
 
       <div class="flex gap-2 justify-end">
@@ -66,14 +66,11 @@ const { createJob } = useJob()
 
 const form = reactive({
   workplace_name: '',
-  workplace_address: '',
-  industry: '',
   employment_type: '',
   hourly_rate: 0,
   weekly_hours: 0,
   daily_hours: 0,
-  start_date: '',
-  end_date: ''
+  start_date: ''
 })
 
 async function onSubmit() {
@@ -85,18 +82,14 @@ async function onSubmit() {
   try {
     const payload = {
       workplace_name: form.workplace_name,
-      workplace_address: form.workplace_address,
-      industry: form.industry,
       employment_type: form.employment_type,
       hourly_rate: form.hourly_rate,
       weekly_hours: form.weekly_hours,
       daily_hours: form.daily_hours,
-      // start_date must not be null
       start_date: form.start_date,
-      end_date: form.end_date || null,
       has_paid_weekly_holiday: true,
       is_severance_eligible: false,
-      is_current: form.end_date ? true : true,
+      is_current: true
     }
     const created = await createJob(payload as any)
     emit('saved', created)

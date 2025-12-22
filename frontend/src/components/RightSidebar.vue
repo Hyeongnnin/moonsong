@@ -28,13 +28,6 @@
           </svg>
           다른 알바 보기
         </button>
-
-        <!-- 현재 선택된 알바 정보 -->
-        <div v-if="activeJob" class="mt-4 p-3 bg-brand-50 rounded-lg border border-brand-100">
-          <p class="text-xs text-brand-700 font-medium mb-1">현재 선택된 알바</p>
-          <p class="text-sm font-semibold text-gray-900">{{ activeJob.workplace_name }}</p>
-          <p class="text-xs text-gray-600 mt-1">{{ activeJob.workplace_address }}</p>
-        </div>
       </div>
 
       <!-- 주요 통계 (API 기반) -->
@@ -43,18 +36,10 @@
         <UserAchievementCard ref="achievementCardRef" :activeJob="activeJob" />
       </div>
 
-      <!-- 주휴수당 카드 - 항상 표시 -->
+      <!-- 근로진단 요약 -->
       <div class="mb-6">
-        <HolidayPayCard ref="holidayPayCardRef" :activeJob="activeJob" />
+        <LaborDiagnosisSummary ref="diagnosisSummaryRef" :activeJob="activeJob" />
       </div>
-
-      <!-- 퇴직금 카드 - 항상 표시 -->
-      <div class="mb-8">
-        <RetirementPayCard :activeJob="activeJob" />
-      </div>
-
-      <!-- 근로조건 평가 카드 -->
-      <EvaluationCard />
 
       <!-- JobSelector 모달 컴포넌트 -->
       <JobSelector ref="jobSelectorRef" />
@@ -68,9 +53,7 @@ import { useRouter } from 'vue-router'
 import { useJob } from '../stores/jobStore'
 import { useLabor, type MonthlySummary } from '../composables/useLabor'
 import JobSelector from './JobSelector.vue'
-import EvaluationCard from './EvaluationCard.vue'
-import HolidayPayCard from './HolidayPayCard.vue'
-import RetirementPayCard from './RetirementPayCard.vue'
+import LaborDiagnosisSummary from './LaborDiagnosisSummary.vue'
 import UserAchievementCard from './UserAchievementCard.vue'
 import { useUser } from '../stores/userStore'
 
@@ -81,15 +64,8 @@ const { fetchMonthlySummary } = useLabor()
 const { user, fetchMe } = useUser()
 
 const jobSelectorRef = ref<InstanceType<typeof JobSelector> | null>(null)
-const holidayPayCardRef = ref<InstanceType<typeof HolidayPayCard> | null>(null)
 const achievementCardRef = ref<InstanceType<typeof UserAchievementCard> | null>(null)
-// jobSummary is no longer needed for the main stats, but keeping it if needed for other parts (though we removed the UI)
-// Actually we can remove loadJobSummary for the stats part if we fully replace it.
-// user requested "Sidebar has only Holiday Pay Card".
-// So we can remove jobSummary logic if it's not used elsewhere.
-// But let's keep it safe or remove it if unused.
-// "최종적으로 사이드바는 '주휴수당 카드' 하나만 보이도록 구성해주세요" -> Yes.
-// So we don't need jobSummary for the old cards anymore.
+const diagnosisSummaryRef = ref<InstanceType<typeof LaborDiagnosisSummary> | null>(null)
 
 const userName = computed(() => user.nickname || user.username || '사용자')
 const userRole = computed(() => user.role || '알바생')
@@ -98,7 +74,6 @@ const userAvatar = computed(() => user.avatar)
 
 onMounted(async () => {
   try { await fetchMe() } catch(e) { /* ignore */ }
-  // loadJobSummary() -> Not needed if we remove the old cards
   window.addEventListener('labor-updated', handleLaborUpdate)
 })
 
@@ -107,16 +82,13 @@ onUnmounted(() => {
 })
 
 function handleLaborUpdate() {
-  if (holidayPayCardRef.value) {
-    holidayPayCardRef.value.refresh()
-  }
   if (achievementCardRef.value) {
     achievementCardRef.value.refresh()
   }
+  if (diagnosisSummaryRef.value) {
+    diagnosisSummaryRef.value.refresh()
+  }
 }
-
-// activeJob이 변경되면 HolidayPayCard는 내부 watch로 자동 업데이트됨.
-// 하지만 명시적으로 refresh를 호출해줄 수도 있음.
 
 // 함수: 프로필 수정 페이지 이동
 function navigateToEditProfile() {

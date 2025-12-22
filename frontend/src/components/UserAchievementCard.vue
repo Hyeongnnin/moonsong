@@ -23,9 +23,23 @@
       </button>
     </div>
 
-    <!-- 근로정보가 있을 때 -->
+    <!-- 근로정보가 있을 때 (빈 상태 안내/데이터 표시) -->
     <div v-else>
-      <div class="space-y-3">
+      <!-- 빈 상태: 누적 데이터 전무 -->
+      <div v-if="!hasAnyRecords" class="text-center py-8">
+        <div class="text-4xl mb-3">🧮</div>
+        <p class="text-sm text-gray-600 font-medium mb-2">아직 집계된 근로 기록이 없어요</p>
+        <p class="text-xs text-gray-500 mb-4">근로정보를 설정하면 누적 업적이 표시됩니다</p>
+        <button
+          @click="navigateToJobCreate"
+          class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+        >
+          근로정보 수정하러 가기
+        </button>
+      </div>
+
+      <!-- 데이터가 있을 때 -->
+      <div v-else class="space-y-3">
         <!-- 총 근로시간 -->
         <div class="bg-white bg-opacity-60 rounded-lg p-3 border border-blue-100">
           <div class="flex items-center justify-between">
@@ -90,7 +104,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import type { Job } from '../stores/jobStore';
 import { apiClient } from '../api';
 import { useUser } from '../stores/userStore';
@@ -104,11 +118,13 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const router = useRouter();
+const route = useRoute();
 const { user } = useUser();
 
 const totalHours = ref(0);
 const totalEarnings = ref(0);
 const totalWorkDays = ref(0);
+const hasAnyRecords = computed(() => totalHours.value > 0 || totalEarnings.value > 0 || totalWorkDays.value > 0);
 
 const userName = computed(() => user.nickname || user.username || '사용자');
 
@@ -137,7 +153,11 @@ const achievementBadge = computed(() => {
 // 근로정보 입력 페이지로 이동
 function navigateToJobCreate() {
   // MainLayout의 "근로정보 수정" 탭으로 이동
-  router.push('/dashboard?section=profile-edit');
+  if (route.path === '/dashboard' && route.query.section === 'profile-edit') {
+    window.dispatchEvent(new CustomEvent('go-section', { detail: 'profile-edit' }));
+    return;
+  }
+  router.push('/dashboard?section=profile-edit').catch(() => {});
 }
 
 // 누적 데이터 로드
@@ -156,6 +176,13 @@ async function loadAchievementData() {
     const res = await apiClient.get(`/labor/jobs/${employeeId}/cumulative-stats/`);
     
     console.log('[UserAchievementCard] ✅ API 응답:', res.data);
+    if (res.data?.records_debug) {
+      console.log('[UserAchievementCard] 🧾 집계에 포함된 레코드 상세 (records_debug):');
+      for (const r of res.data.records_debug) {
+        console.log(`  #${r.id} ${r.date} in=${r.time_in} out=${r.time_out} break=${r.break_minutes} ▶ minutes=${r.daily_work_minutes}`);
+      }
+      console.log('[UserAchievementCard] 🧮 record_ids:', res.data.record_ids);
+    }
     console.log('[UserAchievementCard] 📊 total_hours:', res.data.total_hours, typeof res.data.total_hours);
     console.log('[UserAchievementCard] 💰 total_earnings:', res.data.total_earnings, typeof res.data.total_earnings);
     console.log('[UserAchievementCard] 📅 total_work_days:', res.data.total_work_days, typeof res.data.total_work_days);

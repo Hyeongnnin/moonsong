@@ -1,6 +1,6 @@
 <template>
   <div class="space-y-4">
-    <p class="text-sm text-gray-600">주간 근무 스케줄을 입력하세요. 각 요일에 대해 출근/퇴근 시간을 30분 단위로 설정합니다.</p>
+    <p class="text-sm text-gray-600">저장 시 캘린더 전체 근로시간이 변경돼요! 월별 및 일별 근로정보 변경은 캘린더에서 해주세요.</p>
     <div class="grid grid-cols-1 gap-3">
       <div v-for="d in weekdays" :key="d.value" class="flex items-center gap-3">
         <div class="w-20 text-sm font-medium">{{ d.label }}</div>
@@ -23,7 +23,7 @@
         
         <label class="ml-2 inline-flex items-center gap-2 text-sm cursor-pointer select-none">
           <input type="checkbox" v-model="localSchedules[d.value].enabled" class="rounded border-gray-300 text-brand-600 focus:ring-brand-500" /> 
-          <span :class="localSchedules[d.value].enabled ? 'text-gray-900' : 'text-gray-400'">활성</span>
+          <span :class="localSchedules[d.value].enabled ? 'text-gray-900' : 'text-gray-400'">일하는 날</span>
         </label>
       </div>
     </div>
@@ -124,28 +124,68 @@ async function loadSchedules() {
   }
 }
 
-async function saveSchedules() {
-  if (!props.employeeId) {
+type ScheduleState = Record<number, { start_time: string | null, end_time: string | null, enabled: boolean }>
+
+function cloneSchedules(source?: ScheduleState | null): ScheduleState {
+  const target: ScheduleState = {
+    0: { start_time: null, end_time: null, enabled: false },
+    1: { start_time: null, end_time: null, enabled: false },
+    2: { start_time: null, end_time: null, enabled: false },
+    3: { start_time: null, end_time: null, enabled: false },
+    4: { start_time: null, end_time: null, enabled: false },
+    5: { start_time: null, end_time: null, enabled: false },
+    6: { start_time: null, end_time: null, enabled: false },
+  }
+  const src = source || localSchedules
+  weekdays.forEach(w => {
+    const data = src[w.value]
+    target[w.value] = {
+      start_time: data?.start_time ?? null,
+      end_time: data?.end_time ?? null,
+      enabled: !!data?.enabled,
+    }
+  })
+  return target
+}
+
+async function saveSchedules(options?: { schedules?: ScheduleState, employeeId?: number }) {
+  const targetEmployeeId = options?.employeeId ?? props.employeeId
+  if (!targetEmployeeId) {
     alert('먼저 알바 정보를 저장한 다음 스케줄을 저장하세요.')
     return
   }
+
+  const scheduleSource = options?.schedules || localSchedules
   
   try {
     const requests = weekdays.map(w => {
-      const schedule = localSchedules[w.value];
+      const schedule = scheduleSource[w.value];
       const payload = {
         weekday: w.value,
         start_time: schedule.enabled ? schedule.start_time : null,
         end_time: schedule.enabled ? schedule.end_time : null,
         enabled: schedule.enabled,
       };
-      return apiClient.post(`/labor/jobs/${props.employeeId}/schedules/`, payload);
+      return apiClient.post(`/labor/jobs/${targetEmployeeId}/schedules/`, payload);
     });
     
-    await Promise.all(requests);
+    const responses = await Promise.all(requests);
     
-    // 전역 이벤트 발생 - 캘린더 등 다른 컴포넌트 갱신
-    window.dispatchEvent(new CustomEvent('labor-updated'));
+    // 마지막 응답에서 최신 통계 추출 (모든 응답이 동일한 통계를 포함)
+    const lastResponse = responses[responses.length - 1];
+    if (lastResponse?.data?.stats) {
+      // 통계 정보를 이벤트와 함께 전달
+      window.dispatchEvent(new CustomEvent('labor-updated', {
+        detail: {
+          stats: lastResponse.data.stats,
+          dates: lastResponse.data.dates,
+          cumulative_stats: lastResponse.data.cumulative_stats
+        }
+      }));
+    } else {
+      // 이전 방식 호환성 유지
+      window.dispatchEvent(new CustomEvent('labor-updated'));
+    }
   } catch (e) {
     console.error('Failed to save schedules', e);
     throw e; // 상위로 에러 전파
@@ -178,6 +218,7 @@ watch(() => props.employeeId, (newId, oldId) => {
 defineExpose({
   saveSchedules,
   loadSchedules,
+  exportSchedules: () => cloneSchedules(localSchedules),
 });
 </script>
 

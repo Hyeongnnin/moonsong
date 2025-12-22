@@ -12,8 +12,10 @@
 <script setup lang="ts">
 import { useRouter } from "vue-router";
 import Header from "./Header.vue";
+import { useUser } from "../stores/userStore";
 
 const router = useRouter();
+const { checkAuth, fetchMe } = useUser();
 
 function onNavigate(page: string) {
   // map the event strings to routes
@@ -23,7 +25,7 @@ function onNavigate(page: string) {
   else if (page === "dashboard") router.push("/dashboard");
 }
 
-function onLoggedIn(token: string, refreshToken?: string) {
+async function onLoggedIn(token: string, refreshToken?: string) {
   // store JWT for axios interceptor compatibility
   try {
     if (typeof window !== "undefined") {
@@ -32,6 +34,15 @@ function onLoggedIn(token: string, refreshToken?: string) {
       if (refreshToken) window.localStorage.setItem("refresh", refreshToken);
     }
   } catch (e) {}
+  
+  // Update user store authentication status and fetch user data
+  checkAuth();
+  try {
+    await fetchMe();
+  } catch (err) {
+    console.error('Failed to fetch user data after login', err);
+  }
+  
   router.push("/dashboard");
 }
 </script>

@@ -58,17 +58,22 @@
                   </ErrorBoundary>
                 </section>
 
-                <!-- Section 1: AI상담 -->
+                <!-- Section 1: 근로진단 -->
+                <section class="flex-shrink-0 w-full h-full overflow-y-auto">
+                  <LaborDiagnosisSection />
+                </section>
+
+                <!-- Section 2: AI상담 -->
                 <section class="flex-shrink-0 w-full h-full overflow-y-auto">
                   <AiConsultSection />
                 </section>
 
-                <!-- Section 2: 근로정보 수정 -->
+                <!-- Section 3: 근로정보 수정 -->
                 <section class="flex-shrink-0 w-full h-full overflow-y-auto">
                   <LaborEditSection />
                 </section>
 
-                <!-- Section 3: 근로서류 -->
+                <!-- Section 4: 근로서류 -->
                 <section class="flex-shrink-0 w-full h-full overflow-y-auto">
                   <DocumentsSection />
                 </section>
@@ -88,7 +93,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, defineAsyncComponent, onMounted, watch } from 'vue'
+import { ref, defineAsyncComponent, onMounted, watch, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import TopNav from './TopNav.vue'
 import RightSidebar from './RightSidebar.vue'
@@ -100,22 +105,32 @@ const LaborDashboard = defineAsyncComponent(() => import('./DashboardContent.vue
 const AiConsultSection = defineAsyncComponent(() => import('../pages/AiConsult.vue'))
 const LaborEditSection = defineAsyncComponent(() => import('../pages/LaborEdit.vue'))
 const DocumentsSection = defineAsyncComponent(() => import('../pages/Documents.vue'))
+const LaborDiagnosisSection = defineAsyncComponent(() => import('../pages/LaborDiagnosis.vue'))
 
 // Section definitions
 const sections = [
   { id: 'labor', label: '근로관리' },
+  { id: 'diagnosis', label: '근로진단' },
   { id: 'ai-consult', label: 'AI상담' },
   { id: 'profile-edit', label: '근로정보 수정' },
   { id: 'documents', label: '근로서류' },
 ]
 
-// Active section state (0-3)
+// Active section state (0-4)
 const activeSection = ref(0)
 
 const { initialize: initializeJobs } = useJob()
 const route = useRoute()
 
 // 컴포넌트 마운트 시 Job 데이터 초기화 및 URL 쿼리 파라미터 확인
+function handleGoSection(ev: CustomEvent<string>) {
+  const id = ev.detail
+  const sectionIndex = sections.findIndex(s => s.id === id)
+  if (sectionIndex !== -1) {
+    activeSection.value = sectionIndex
+  }
+}
+
 onMounted(async () => {
   try {
     await initializeJobs()
@@ -131,6 +146,8 @@ onMounted(async () => {
   } catch (err) {
     console.error('Failed to initialize jobs:', err)
   }
+  // 전역 섹션 전환 이벤트 리스너 등록 (같은 URL 내에서 강제 전환용)
+  window.addEventListener('go-section', handleGoSection as EventListener)
 })
 
 // URL 쿼리 파라미터 변경 감지 (실시간 섹션 전환)
@@ -155,6 +172,10 @@ function nextSection() {
     activeSection.value++
   }
 }
+
+onUnmounted(() => {
+  window.removeEventListener('go-section', handleGoSection as EventListener)
+})
 </script>
 
 <style scoped>

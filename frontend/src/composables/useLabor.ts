@@ -86,9 +86,13 @@ export interface EvaluationResult {
 }
 
 export interface AnnualLeaveResult {
-  total: number
-  used: number
-  available: number
+  as_of: string
+  earned_days: number
+  used_days: number
+  remaining_days: number
+  rule_version: string
+  is_eligible: boolean
+  reason: string
 }
 
 // ===== State =====
@@ -170,7 +174,7 @@ export function useLabor(accessToken?: string) {
     error.value = null
     try {
       const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
-      const response = await apiClient.get<AnnualLeaveResult>(`/labor/jobs/${jobId}/annual-leave/`, { headers })
+      const response = await apiClient.get<AnnualLeaveResult>(`/labor/leave/annual/summary/?workplace_id=${jobId}`, { headers })
       return response.data
     } catch (err: any) {
       error.value = err.response?.data?.detail || '연차 정보 조회 실패'

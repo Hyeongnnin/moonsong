@@ -19,7 +19,6 @@ class JobInputs:
     hourly_rate: float
     employment_type: str
     start_date: date
-    end_date: Optional[date]
     is_current: bool
     has_paid_weekly_holiday: bool
     attendance_rate_last_year: Optional[float]
@@ -161,9 +160,8 @@ def job_to_inputs(employee) -> JobInputs:
         work_days_per_week=work_days_per_week if work_days_per_week > 0 else None,
         employment_type=employee.employment_type,
         start_date=employee.start_date,
-        end_date=employee.end_date,
-        is_current=employee.is_current,
-        has_paid_weekly_holiday=employee.has_paid_weekly_holiday,
+        is_current=True,  # 기본값: 재직 중
+        has_paid_weekly_holiday=True,  # 기본값: 주휴수당 있음
         attendance_rate_last_year=float(employee.attendance_rate_last_year)
         if employee.attendance_rate_last_year is not None
         else None,
@@ -206,172 +204,80 @@ from .models import WorkSchedule, WorkRecord, MonthlySchedule
 
 def monthly_scheduled_dates(employee, year, month):
     """
-    주어진 월의 각 날짜에 대해 근무가 예정되어 있는지 또는 실제 근무했는지 여부를 반환합니다.
-    
-    우선순위:
-    1. 실제 WorkRecord (가장 높음) - 과거/현재 날짜
-    2. MonthlySchedule (월별 오버라이드) - 과거/현재 날짜만
-    3. WorkSchedule (전역 주간 스케줄) - 과거/현재 날짜만
-    
-    중요: 미래 날짜(오늘 이후)는 스케줄이 있어도 표시하지 않음
+    주어진 월의 각 날짜에 대해 스케줄 여부를 표시하고, 실제 근로기록이 있으면 함께 반환합니다.
+
+    표시 규칙:
+    - is_scheduled: 월별 오버라이드(MonthlySchedule)가 있으면 그것, 없으면 주간 스케줄(WorkSchedule)을 기준으로 해당 요일이 활성(enabled=True)이고 시간이 있으면 True
+    - 실제 WorkRecord가 존재하고 시간이 0보다 크면 당연히 True 유지
+    - record 필드는 프론트 모달 로딩에 활용되며, 달력 표시에는 is_scheduled만 사용
     """
-    from django.utils import timezone
-    
-    # 오늘 날짜
-    today = timezone.now().date()
-    
-    # 1. 해당 월의 MonthlySchedule 조회
-    monthly_schedules = MonthlySchedule.objects.filter(
-        employee=employee,
-        year=year,
-        month=month,
-        enabled=True
-    )
-    
-    # 2. 기본 WorkSchedule 조회
-    default_schedules = WorkSchedule.objects.filter(employee=employee, enabled=True)
-    
-    # 실제 근무 기록 가져오기
+    # 실제 근무 기록 맵 (달력은 실제 기록만 강조)
     work_records = WorkRecord.objects.filter(
         employee=employee,
         work_date__year=year,
         work_date__month=month
     )
-    # 날짜별 기록 매핑
-    worked_records_map = {wr.work_date: wr for wr in work_records}
+    records_map = {wr.work_date: wr for wr in work_records}
 
-    # MonthlySchedule이 있으면 우선 사용, 없으면 기본 스케줄 사용
-    if monthly_schedules.exists():
-        schedule_map = {}
-        for s in monthly_schedules:
-            if s.start_time and s.end_time:
-                schedule_map[s.weekday] = s
-    else:
-        schedule_map = {}
-        for s in default_schedules:
-            if s.start_time and s.end_time:
-                schedule_map[s.weekday] = s
-    
     cal = calendar.Calendar()
     month_dates = cal.itermonthdates(year, month)
-    
+    # 실제 기록만 강조하므로 미래/과거 구분은 필요 없음
     scheduled_dates_data = []
     for dt in month_dates:
         if dt.month != month:
             continue
-        
-        is_scheduled = False
-        
-        # 1. 실제 기록 확인 (우선순위 가장 높음)
-        if dt in worked_records_map:
-            record = worked_records_map[dt]
-            # 실제 기록이 있으면, 기록된 시간이 0보다 클 때만 '스케줄됨'으로 표시
-            if record.get_total_hours() > 0:
-                is_scheduled = True
-            else:
-                is_scheduled = False
-        # 2. 스케줄 확인 (실제 기록이 없는 경우에만)
-        # 중요: 미래 날짜는 스케줄이 있어도 표시하지 않음
-        elif dt <= today and dt.weekday() in schedule_map:
-            is_scheduled = True
-            
+
+        record = records_map.get(dt)
+        is_scheduled = bool(record and record.get_total_hours() > 0)
+
         scheduled_dates_data.append({
             "date": dt.isoformat(),
             "is_scheduled": is_scheduled,
         })
+
     return scheduled_dates_data
 
 
 def compute_monthly_schedule_stats(employee, year, month):
     """
-    월별 근무 스케줄 통계(예상 총 근무시간, 예상 급여 등)를 계산합니다.
-    실제 근무 기록이 있는 날은 스케줄 대신 실제 기록을 우선합니다.
+    월별 근무 통계를 계산합니다.
+    실제 근무 기록(WorkRecord)만 사용하여 통계를 계산합니다.
+    스케줄 기반 예상 값은 포함하지 않습니다.
     
-    우선순위:
-    1. 실제 WorkRecord (가장 높음)
-    2. MonthlySchedule (월별 오버라이드) - 오늘 이전만
-    3. WorkSchedule (전역 주간 스케줄) - 오늘 이전만
-    
-    중요: 미래 날짜(오늘 이후)의 스케줄은 통계에 포함하지 않음
+    v4 (2025-01-15): 실제 근무 기록만 사용하도록 변경
+    - 삭제 후 통계가 남아있는 문제 수정
+    - cumulative_stats, monthly_scheduled_dates와 동일한 로직 적용
     """
     from django.utils import timezone
     
     # 오늘 날짜
     today = timezone.now().date()
     
-    # 1. 해당 월의 MonthlySchedule 조회
-    monthly_schedules = MonthlySchedule.objects.filter(
-        employee=employee,
-        year=year,
-        month=month,
-        enabled=True
-    )
-    
-    # 2. 기본 WorkSchedule 조회
-    default_schedules = WorkSchedule.objects.filter(employee=employee, enabled=True)
-    
     hourly_rate = float(employee.hourly_rate)
 
-    total_scheduled_hours = 0
-    scheduled_work_days = 0
-    
-    # 이번 달의 첫날과 마지막 날
-    start_of_month = date(year, month, 1)
-    end_of_month = date(year, month, calendar.monthrange(year, month)[1])
-
-    # 이번 달의 실제 근무 기록 가져오기
+    # 이번 달의 실제 근무 기록만 가져오기
     work_records = WorkRecord.objects.filter(
         employee=employee,
         work_date__year=year,
         work_date__month=month
     )
 
-    # 실제 근무 기록이 있는 날짜 집합 (0시간 기록 포함 - 스케줄 오버라이드용)
-    worked_dates = {wr.work_date for wr in work_records}
-
-    # 실제 근무 기록 기반으로 시간 계산
+    # 실제 근무 기록 기반으로만 시간 계산
     actual_hours_worked = sum(float(wr.get_total_hours()) for wr in work_records)
     
     # 실제 근무일 수 계산 (0시간 기록 제외)
     actual_work_days = sum(1 for wr in work_records if wr.get_total_hours() > 0)
 
-    # MonthlySchedule이 있으면 우선 사용, 없으면 기본 스케줄 사용
-    if monthly_schedules.exists():
-        schedule_map = {s.weekday: s for s in monthly_schedules}
-    else:
-        schedule_map = {s.weekday: s for s in default_schedules}
-    
-    # 스케줄 기반으로 예상 시간 계산
-    # 중요: 오늘 이전 날짜만 계산, 미래는 제외
-    current_date = start_of_month
-    while current_date <= end_of_month and current_date <= today:  # 오늘까지만
-        # 실제 기록(취소 포함)이 있으면 스케줄 무시
-        if current_date not in worked_dates and current_date.weekday() in schedule_map:
-            schedule = schedule_map[current_date.weekday()]
-            if schedule.start_time and schedule.end_time:
-                # 시간 계산
-                start_hour = schedule.start_time.hour + schedule.start_time.minute / 60
-                end_hour = schedule.end_time.hour + schedule.end_time.minute / 60
-                
-                # 야간 근무 처리 (종료 시간이 시작 시간보다 빠른 경우)
-                if end_hour <= start_hour:
-                    end_hour += 24
-                
-                duration_hours = end_hour - start_hour
-                total_scheduled_hours += duration_hours
-                scheduled_work_days += 1
-        current_date += timedelta(days=1)
-
-    # 총 근무 시간 = 실제 근무 시간 + 예상 근무 시간 (오늘까지만)
-    total_hours = actual_hours_worked + total_scheduled_hours
-    total_days = actual_work_days + scheduled_work_days
+    # 총 근무 시간 = 실제 근무 시간만 (스케줄 예상 값 제외)
+    total_hours = actual_hours_worked
+    total_days = actual_work_days
     
     # 총 급여 계산
     total_salary = total_hours * hourly_rate
 
     # ============================================================
     # 이번 주 통계 계산 (주휴수당 계산용)
-    # 중요: 오늘 이전 날짜만 계산, 미래는 제외
+    # 실제 근무 기록만 사용
     # ============================================================
     start_of_week = today - timedelta(days=today.weekday())
     end_of_week = start_of_week + timedelta(days=6)
@@ -396,28 +302,8 @@ def compute_monthly_schedule_stats(employee, year, month):
     
     logger.info(f'  Total actual hours this week: {actual_this_week_hours}')
     
-    # 이번 주 스케줄 예상 시간 계산 (실제 근무 기록이 없는 날만, 오늘까지만)
-    scheduled_this_week_hours = Decimal('0')
-    current_day = start_of_week
-    actual_work_dates = set(wr.work_date for wr in actual_this_week_records)
-    
-    while current_day <= min(end_of_week, today):  # 오늘까지만
-        # 실제 근무 기록이 없고, 스케줄이 있는 날만 계산
-        if current_day not in actual_work_dates and current_day.weekday() in schedule_map:
-            schedule = schedule_map[current_day.weekday()]
-            if schedule.start_time and schedule.end_time:
-                start_hour = schedule.start_time.hour + schedule.start_time.minute / 60
-                end_hour = schedule.end_time.hour + schedule.end_time.minute / 60
-                if end_hour <= start_hour:
-                    end_hour += 24
-                hours = Decimal(str(end_hour - start_hour))
-                scheduled_this_week_hours += hours
-                logger.info(f'  Scheduled on {current_day} ({current_day.strftime("%A")}): {hours} hours')
-        current_day += timedelta(days=1)
-    
-    logger.info(f'  Total scheduled hours this week: {scheduled_this_week_hours}')
-    
-    total_this_week_hours = actual_this_week_hours + scheduled_this_week_hours
+    # 스케줄 예상 시간 제외 (실제 근무 기록만 사용)
+    total_this_week_hours = actual_this_week_hours
     logger.info(f'  Total this week hours: {total_this_week_hours}')
 
     return {
@@ -426,6 +312,108 @@ def compute_monthly_schedule_stats(employee, year, month):
         "scheduled_work_days": total_days,
         "scheduled_this_week_hours": float(total_this_week_hours),
         "scheduled_this_week_estimated_salary": float(total_this_week_hours * Decimal(str(hourly_rate))),
+    }
+
+
+def _overlap_hours(start_dt, end_dt, window_start_time, window_end_time):
+    """주어진 날짜의 시각 구간과 특정 시간창 사이 겹치는 시간을 시간(float)으로 반환.
+
+    window_end_time가 다음날(예: 22:00~06:00)로 넘어가는 경우를 지원합니다.
+    """
+    from datetime import datetime, timedelta
+    if not start_dt or not end_dt:
+        return 0.0
+    if end_dt <= start_dt:
+        return 0.0
+
+    day = start_dt.date()
+    w_start = datetime.combine(day, window_start_time)
+    w_end = datetime.combine(day, window_end_time)
+
+    # start/end가 tz-aware인 경우, 비교를 위해 window도 동일 tz로 맞춤
+    tzinfo = getattr(start_dt, 'tzinfo', None)
+    if tzinfo is not None and w_start.tzinfo is None:
+        w_start = w_start.replace(tzinfo=tzinfo)
+        w_end = w_end.replace(tzinfo=tzinfo)
+
+    if window_end_time <= window_start_time:
+        # 다음날로 넘어가는 창 (예: 22:00~06:00)
+        w_end = w_end + timedelta(days=1)
+
+    # 교집합 계산
+    s = max(start_dt, w_start)
+    e = min(end_dt, w_end)
+    if e <= s:
+        return 0.0
+    return (e - s).total_seconds() / 3600.0
+
+
+def compute_monthly_payroll(employee, year, month):
+    """월 단위 급여 최소 계산 (우선 카드 표시용)
+
+    - 실근로시간: 각 WorkRecord의 `get_total_hours()` 합
+    - 근로일수: `get_total_hours() > 0` 인 레코드 수
+    - 급여: 시급 × 실근로시간
+
+    추가 반영:
+    - 휴게구간(break_intervals, break_start/break_end) 우선 적용 (WorkRecord.get_total_hours 내부 반영)
+    - 휴일근무(`day_type=HOLIDAY_WORK`) 총 시간 및 금액 집계 (월별 부가 정보 제공)
+    TODO: 야간/연장/주휴 가산은 추후 단계에서 추가
+    """
+    hourly_rate = float(employee.hourly_rate or 0)
+
+    records = WorkRecord.objects.filter(
+        employee=employee,
+        work_date__year=year,
+        work_date__month=month,
+    )
+
+    total_hours = 0.0
+    total_work_days = 0
+    holiday_hours = 0.0
+    for r in records:
+        hours = float(r.get_total_hours())
+        if hours > 0:
+            total_hours += hours
+            total_work_days += 1
+            if getattr(r, 'day_type', 'NORMAL') == 'HOLIDAY_WORK':
+                holiday_hours += hours
+
+    base_hours = max(total_hours - holiday_hours, 0.0)
+    overtime_hours = 0.0
+    night_hours = 0.0
+    weekly_holiday_hours = 0.0
+
+    base_pay = base_hours * hourly_rate
+    overtime_pay = overtime_hours * hourly_rate * 0.5
+    night_pay = night_hours * hourly_rate * 0.5
+    holiday_pay = holiday_hours * hourly_rate
+    weekly_holiday_pay = weekly_holiday_hours * hourly_rate
+
+    estimated_salary = base_pay + overtime_pay + night_pay + holiday_pay + weekly_holiday_pay
+
+    breakdown = {
+        "base_hours": round(base_hours, 2),
+        "overtime_hours": round(overtime_hours, 2),
+        "night_hours": round(night_hours, 2),
+        "holiday_hours": round(holiday_hours, 2),
+        "weekly_holiday_hours": round(weekly_holiday_hours, 2),
+        "base_pay": round(base_pay, 2),
+        "overtime_pay": round(overtime_pay, 2),
+        "night_pay": round(night_pay, 2),
+        "holiday_pay": round(holiday_pay, 2),
+        "weekly_holiday_pay": round(weekly_holiday_pay, 2),
+    }
+
+    return {
+        "month": f"{year}-{str(month).zfill(2)}",
+        "total_hours": round(total_hours, 2),
+        "total_work_days": total_work_days,
+        "hourly_wage": round(hourly_rate, 2),
+        "estimated_salary": round(estimated_salary, 2),
+        "holiday_hours": round(holiday_hours, 2),
+        "holiday_pay": round(holiday_pay, 2),
+        "breakdown": breakdown,
     }
 
 
@@ -460,7 +448,7 @@ def calculate_retirement_pay(employee) -> Dict[str, Any]:
     
     # 1. 재직기간 계산
     start_date = employee.start_date
-    end_date = employee.end_date if employee.end_date else today
+    end_date = today  # 현재 날짜 기준으로 계산
     
     if not start_date:
         return {
@@ -490,8 +478,26 @@ def calculate_retirement_pay(employee) -> Dict[str, Any]:
     
     # 3. 통상임금 계산 (시급 기준)
     # 통상임금 = (시급 × 주간 근로시간 × 52주) / 365일
+    from .models import WorkSchedule
+    
     hourly_rate = Decimal(str(employee.hourly_rate))
-    weekly_hours = Decimal(str(employee.weekly_hours)) if employee.weekly_hours else Decimal('40')
+    
+    # WorkSchedule에서 주당 근로시간 계산
+    schedules = WorkSchedule.objects.filter(employee=employee, enabled=True)
+    weekly_hours = Decimal('0')
+    for schedule in schedules:
+        if schedule.start_time and schedule.end_time:
+            from datetime import datetime
+            dummy_date = datetime(2000, 1, 1)
+            dt_start = datetime.combine(dummy_date.date(), schedule.start_time)
+            dt_end = datetime.combine(dummy_date.date(), schedule.end_time)
+            diff = dt_end - dt_start
+            hours = Decimal(str(diff.total_seconds() / 3600))
+            weekly_hours += hours
+    
+    # 스케줄이 없으면 기본값 40시간 사용
+    if weekly_hours == 0:
+        weekly_hours = Decimal('40')
     
     annual_wage = hourly_rate * weekly_hours * Decimal('52')
     regular_daily_wage = annual_wage / Decimal('365')

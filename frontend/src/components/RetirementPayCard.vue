@@ -1,6 +1,6 @@
 <template>
-  <div class="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
-    <h3 class="text-lg font-semibold text-gray-900 mb-4">퇴직금 예상액</h3>
+  <div class="bg-white rounded-lg p-5 shadow-sm border border-gray-200">
+    <h3 class="text-lg font-semibold text-gray-900 mb-3">퇴직금 예상액</h3>
     
     <!-- 근로정보가 없을 때 -->
     <div v-if="!activeJob" class="text-center py-8">
@@ -30,7 +30,7 @@
       
       <div v-else-if="data">
         <!-- 퇴직금 금액 -->
-        <div class="mb-4">
+        <div class="mb-3">
           <div 
             :class="[
               'text-3xl font-bold',
@@ -42,7 +42,7 @@
         </div>
 
         <!-- 상세 정보 -->
-        <div class="space-y-2 text-sm">
+        <div class="space-y-1.5 text-sm">
           <div class="flex justify-between text-gray-600">
             <span>평균임금 (일급)</span>
             <span class="font-medium">{{ formatCurrency(data.average_wage) }}원</span>
@@ -54,26 +54,10 @@
         </div>
 
         <!-- 자격 여부 메시지 -->
-        <div class="mt-4 pt-4 border-t border-gray-100">
-          <p v-if="!data.eligible" class="text-xs text-gray-500">
+        <div v-if="!data.eligible" class="mt-3 pt-3 border-t border-gray-100">
+          <p class="text-xs text-gray-500 leading-tight">
             ⚠️ 재직기간이 1년 미만이므로 퇴직금 지급 대상이 아닙니다.
           </p>
-          <p v-else class="text-xs text-gray-500">
-            * 실제 지급액은 근로조건 및 퇴사 사유에 따라 달라질 수 있습니다.
-          </p>
-        </div>
-
-        <!-- 계산 상세 (접기/펼치기) -->
-        <div class="mt-3">
-          <button
-            @click="showDetails = !showDetails"
-            class="text-xs text-brand-600 hover:text-brand-700 flex items-center gap-1"
-          >
-            {{ showDetails ? '▼' : '▶' }} 계산 상세 보기
-          </button>
-          <div v-if="showDetails" class="mt-2 p-3 bg-gray-50 rounded text-xs text-gray-600 whitespace-pre-line">
-            {{ data.calculation_details }}
-          </div>
         </div>
       </div>
     </div>
@@ -82,7 +66,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { apiClient } from '../api'
 
 interface RetirementPayData {
@@ -104,6 +88,7 @@ const props = defineProps<{
 }>()
 
 const router = useRouter()
+const route = useRoute()
 const data = ref<RetirementPayData | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)
@@ -115,8 +100,12 @@ const formatCurrency = (value: number) => {
 
 // 근로정보 입력 페이지로 이동
 function navigateToJobCreate() {
-  // MainLayout의 "근로정보 수정" 탭으로 이동
-  router.push('/dashboard?section=profile-edit')
+  // 이미 동일 경로/섹션이면 전역 이벤트로 강제 전환
+  if (route.path === '/dashboard' && route.query.section === 'profile-edit') {
+    window.dispatchEvent(new CustomEvent('go-section', { detail: 'profile-edit' }))
+    return
+  }
+  router.push('/dashboard?section=profile-edit').catch(() => {})
 }
 
 const fetchRetirementPay = async () => {

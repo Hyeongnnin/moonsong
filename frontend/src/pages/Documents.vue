@@ -1,8 +1,8 @@
 <template>
-  <section>
+  <section class="space-y-4">
     <h2 class="text-2xl font-semibold mb-4">근로서류</h2>
     <div class="p-4 bg-white rounded shadow space-y-4">
-      <!-- ✅ B 프로젝트 병합: 이력서 자동 생성 탭 추가 -->
+      <!-- 탭 -->
       <div class="flex gap-2 border-b border-gray-200 pb-2">
         <button @click="tab = 'resume'" :class="tabClass(tab === 'resume')">
           이력서 자동 생성
@@ -15,36 +15,54 @@
         </button>
       </div>
 
-      <div v-if="tab === 'resume'">
-        <ResumeGenerator @saved="onResumeSaved" />
-      </div>
-      <div v-else-if="tab === 'generated'">
-        <GeneratedDocuments ref="docsRef" />
-      </div>
-      <div v-else>
-        <DocumentsTemplates />
+      <!-- 탭 컨텐츠 -->
+      <div class="w-full max-w-3xl px-4 mx-auto">
+        <div v-if="tab === 'resume'">
+          <ResumeFormCard @preview="openPreview" @generated="onGenerated" />
+        </div>
+        <div v-else-if="tab === 'generated'">
+          <GeneratedDocuments ref="docsRef" />
+        </div>
+        <div v-else>
+          <DocumentsTemplates />
+        </div>
       </div>
     </div>
+
+    <!-- 미리보기 모달 (완전 격리) -->
+    <ResumePreviewModal 
+      v-if="showPreview" 
+      :data="previewData" 
+      @close="showPreview = false" 
+    />
   </section>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import ResumeFormCard from '../components/ResumeFormCard.vue'
+import ResumePreviewModal from '../components/ResumePreviewModal.vue'
 import GeneratedDocuments from '../components/GeneratedDocuments.vue'
 import DocumentsTemplates from '../components/DocumentsTemplates.vue'
-import ResumeGenerator from '../components/ResumeGenerator.vue'  // ✅ B 프로젝트 병합
 
+const tab = ref<'resume' | 'generated' | 'templates'>('resume')
+const showPreview = ref(false)
+const previewData = ref<any>(null)
 const docsRef = ref<InstanceType<typeof GeneratedDocuments> | null>(null)
-const tab = ref<'resume' | 'generated' | 'templates'>('resume')  // ✅ B 프로젝트 병합: 기본값 변경
 
-function onResumeSaved() {
-  // 이력서 생성 후 서류함 새로고침
+function openPreview(data: any) {
+  previewData.value = data
+  showPreview.value = true
+}
+
+function onGenerated() {
+  tab.value = 'generated'
   docsRef.value?.reload()
 }
 
 function tabClass(isActive: boolean) {
   return [
-    'px-4 py-2 text-sm font-medium rounded',
+    'px-4 py-2 text-sm font-medium rounded transition-colors',
     isActive ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
   ].join(' ')
 }

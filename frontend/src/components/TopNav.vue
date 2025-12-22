@@ -33,9 +33,9 @@
           <div v-if="isLoggedIn" class="flex items-center gap-3 pl-3 border-l border-gray-200 relative">
             <div class="flex items-center gap-3 cursor-pointer group">
               <div class="w-8 h-8 rounded-full bg-brand-500 flex items-center justify-center text-white text-sm font-bold flex-shrink-0 group-hover:bg-brand-600 transition-colors duration-200">
-                U
+                {{ userInitial }}
               </div>
-              <span class="hidden sm:inline text-sm font-medium text-gray-900 group-hover:text-brand-600 transition-colors duration-200">사용자</span>
+              <span class="hidden sm:inline text-sm font-medium text-gray-900 group-hover:text-brand-600 transition-colors duration-200">{{ userName }}</span>
               <button 
                 @click="isProfileDropdownOpen = !isProfileDropdownOpen"
                 class="text-gray-600 hover:text-brand-600 transition-colors duration-200"
@@ -75,23 +75,28 @@
 
 <script setup lang="ts">
 import { useRouter } from "vue-router";
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
+import { useUser } from "../stores/userStore";
 
 const router = useRouter();
-const isLoggedIn = ref(false);
+const { user, isLoggedIn, logout, checkAuth, fetchMe } = useUser();
+
 const isMdScreen = ref(window.innerWidth >= 768);
 const isProfileDropdownOpen = ref(false);
+
+const userName = computed(() => user.nickname || user.username || '사용자');
+const userInitial = computed(() => (user.nickname || user.username || '사용자').charAt(0));
 
 function navigateTo(path: string) {
   isProfileDropdownOpen.value = false;
   router.push(path);
 }
 
-function handleLogout() {
-  localStorage.removeItem("access_token");
-  isLoggedIn.value = false;
+async function handleLogout() {
+  await logout(); // Clear tokens and reset user state
   isProfileDropdownOpen.value = false;
-  router.push("/login");
+  // Force full page reload to clear all component state
+  window.location.href = '/login';
 }
 
 // Handle window resize for responsive design
@@ -109,13 +114,20 @@ function handleClickOutside(event: MouseEvent) {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   window.addEventListener("resize", handleResize);
   document.addEventListener("click", handleClickOutside);
   
-  // Check if user is logged in
-  const token = localStorage.getItem("access_token");
-  isLoggedIn.value = !!token;
+  // Check authentication status and fetch user data if logged in
+  if (checkAuth()) {
+    try {
+      await fetchMe();
+    } catch (err) {
+      // If fetch fails, user might have invalid token
+      console.error('Failed to fetch user data on mount', err);
+      logout();
+    }
+  }
 });
 
 onUnmounted(() => {

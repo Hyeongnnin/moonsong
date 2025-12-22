@@ -104,19 +104,21 @@
           </button>
         </form>
 
-        <p v-if="message" class="mt-2 text-sm" :class="messageType === 'error' ? 'text-red-600' : 'text-green-600'">
-          {{ message }}
-        </p>
-
-        <div class="pt-2 text-sm text-gray-600">
+        <div v-if="message" class="mt-2 flex items-center gap-3">
+          <p class="text-sm" :class="messageType === 'error' ? 'text-red-600' : 'text-green-600'">
+            {{ message }}
+          </p>
           <button
+            v-if="messageType === 'success'"
             type="button"
-            class="hover:underline"
+            class="px-3 py-1.5 rounded-md text-sm font-medium bg-brand-100 text-brand-700 hover:bg-brand-200"
             @click="$emit('navigate', 'login')"
           >
-            이미 계정이 있으신가요? 로그인하기
+            로그인
           </button>
         </div>
+
+        <!-- 기존 '이미 계정이 있으신가요? 로그인하기' 안내 제거 -->
       </div>
     </div>
   </div>

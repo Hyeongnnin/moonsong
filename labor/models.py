@@ -10,13 +10,10 @@ class Employee(models.Model):
     """Job(알바) 정보를 저장하는 모델"""
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="employees")
     workplace_name = models.CharField(max_length=200)
-    workplace_address = models.CharField(max_length=255, blank=True)
     workplace_reg_no = models.CharField(max_length=50, blank=True)
-    industry = models.CharField(max_length=100, blank=True)
 
     employment_type = models.CharField(max_length=50, blank=True)  # 정규직/알바 등
     start_date = models.DateField()
-    end_date = models.DateField(null=True, blank=True)
     hourly_rate = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     # 추가 필드 (노동법 평가용) - 단순화된 참고 계산을 위한 데이터
     attendance_rate_last_year = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True, help_text="작년 출근율 0~1")
@@ -51,6 +48,23 @@ class WorkRecord(models.Model):
     time_in = models.DateTimeField(null=True, blank=True)
     time_out = models.DateTimeField(null=True, blank=True)
     break_minutes = models.IntegerField(default=0)
+    # 선택: 휴게 구간 입력 (단일 또는 복수)
+    break_start = models.DateTimeField(null=True, blank=True)
+    break_end = models.DateTimeField(null=True, blank=True)
+    break_intervals = models.JSONField(null=True, blank=True, help_text="[{'start': ISO8601, 'end': ISO8601}, ...]")
+
+    DAY_TYPE_CHOICES = [
+        ('NORMAL', '일반근무'),
+        ('HOLIDAY_WORK', '휴일근무'),
+    ]
+    day_type = models.CharField(max_length=20, choices=DAY_TYPE_CHOICES, default='NORMAL')
+
+    ATTENDANCE_TYPE_CHOICES = [
+        ('WORKED', '근무'),
+        ('APPROVED_LEAVE', '승인된 휴무'),
+        ('ABSENT', '결근'),
+    ]
+    attendance_type = models.CharField(max_length=20, choices=ATTENDANCE_TYPE_CHOICES, default='WORKED')
     is_overtime = models.BooleanField(default=False)
     is_night = models.BooleanField(default=False)
     is_holiday = models.BooleanField(default=False)
@@ -66,13 +80,44 @@ class WorkRecord(models.Model):
         """실제 근로시간 (break 제외)"""
         if not self.time_in or not self.time_out:
             return Decimal('0')
-        
+
         duration = self.time_out - self.time_in
-        total_seconds = duration.total_seconds()
-        total_minutes = total_seconds / 60
-        work_minutes = total_minutes - self.break_minutes
-        
-        return Decimal(str(work_minutes / 60))  # 시간 단위로 변환
+        total_minutes = duration.total_seconds() / 60.0
+
+        # 휴게 시간 계산: 우선순위 (1) break_intervals (2) break_start/break_end (3) break_minutes
+        break_total = 0.0
+
+        try:
+            if self.break_intervals:
+                for itv in self.break_intervals or []:
+                    try:
+                        s_raw = itv.get('start')
+                        e_raw = itv.get('end')
+                        if not s_raw or not e_raw:
+                            continue
+                        s_dt = datetime.fromisoformat(s_raw)
+                        e_dt = datetime.fromisoformat(e_raw)
+                        if e_dt <= s_dt:
+                            continue
+                        # 윈도우 클리핑 (근무시간내)
+                        s = max(s_dt, self.time_in)
+                        e = min(e_dt, self.time_out)
+                        if e > s:
+                            break_total += (e - s).total_seconds() / 60.0
+                    except Exception:
+                        continue
+            elif self.break_start and self.break_end:
+                s = max(self.break_start, self.time_in)
+                e = min(self.break_end, self.time_out)
+                if e > s:
+                    break_total += (e - s).total_seconds() / 60.0
+            else:
+                break_total += float(self.break_minutes or 0)
+        except Exception:
+            break_total += float(self.break_minutes or 0)
+
+        work_minutes = max(0.0, total_minutes - break_total)
+        return Decimal(str(work_minutes / 60.0))
 
 
 class CalculationResult(models.Model):
@@ -139,6 +184,9 @@ class MonthlySchedule(models.Model):
     start_time = models.TimeField(null=True, blank=True)
     end_time = models.TimeField(null=True, blank=True)
     enabled = models.BooleanField(default=True)
+    # 월별 메타: 요일별 기본 휴게(분) 및 주휴일(기준 요일)
+    default_break_minutes_by_weekday = models.JSONField(null=True, blank=True, help_text="{0: 60, 1: 30, ...}")
+    weekly_rest_day = models.IntegerField(null=True, blank=True, choices=WEEKDAY_CHOICES)
     
     class Meta:
         unique_together = [['employee', 'year', 'month', 'weekday']]
@@ -148,3 +196,26 @@ class MonthlySchedule(models.Model):
     
     def __str__(self):
         return f"{self.employee} - {self.year}-{self.month:02d} {self.get_weekday_display()} {self.start_time}-{self.end_time}"
+
+
+class LeaveUsage(models.Model):
+    """연차 사용 기록"""
+    LEAVE_TYPE_CHOICES = [
+        ('annual', '연차'),
+        ('sick', '병가'),
+        ('personal', '개인사유'),
+    ]
+    
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='leave_usages')
+    leave_date = models.DateField()
+    leave_type = models.CharField(max_length=20, choices=LEAVE_TYPE_CHOICES, default='annual')
+    days = models.DecimalField(max_digits=3, decimal_places=1, default=1.0, help_text="사용 일수 (0.5=반차, 1=연차)")
+    reason = models.CharField(max_length=200, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-leave_date']
+        unique_together = [['employee', 'leave_date', 'leave_type']]
+    
+    def __str__(self):
+        return f"{self.employee} - {self.leave_date} ({self.get_leave_type_display()} {self.days}일)"

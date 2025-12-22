@@ -44,4 +44,27 @@ const router = createRouter({
   routes,
 });
 
+// Navigation guard to protect authenticated routes
+router.beforeEach((to, from, next) => {
+  const token = localStorage.getItem('access') || localStorage.getItem('access_token');
+  const isAuthenticated = !!token;
+
+  // Protected routes that require authentication
+  const protectedRoutes = ['/dashboard', '/edit-profile'];
+  const isProtectedRoute = protectedRoutes.some(route => to.path.startsWith(route));
+
+  // If trying to access protected route without authentication
+  if (isProtectedRoute && !isAuthenticated) {
+    next('/login');
+  } 
+  // If already authenticated and trying to access login/signup
+  else if (isAuthenticated && (to.path === '/login' || to.path === '/signup')) {
+    next('/dashboard');
+  }
+  // Otherwise allow navigation
+  else {
+    next();
+  }
+});
+
 export default router;

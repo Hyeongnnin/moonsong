@@ -28,32 +28,6 @@
             placeholder="예: Starbucks 강남점">
         </div>
 
-        <!-- 사업장 주소 -->
-        <div class="mb-6">
-          <label for="workplace_address" class="block text-sm font-semibold text-gray-900 mb-2">
-            사업장 주소
-          </label>
-          <input
-            id="workplace_address"
-            v-model="formData.workplace_address"
-            type="text"
-            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent transition"
-            placeholder="예: 서울시 강남구">
-        </div>
-
-        <!-- 업종 -->
-        <div class="mb-6">
-          <label for="industry" class="block text-sm font-semibold text-gray-900 mb-2">
-            업종
-          </label>
-          <input
-            id="industry"
-            v-model="formData.industry"
-            type="text"
-            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent transition"
-            placeholder="예: 음식료, 소매, 교육">
-        </div>
-
         <!-- 고용형태 -->
         <div class="mb-6">
           <label for="employment_type" class="block text-sm font-semibold text-gray-900 mb-2">
@@ -86,7 +60,7 @@
               required
               min="0"
               step="100"
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent transition"
+              class="w-full px-4 pr-12 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent transition"
               placeholder="2025년 최저시급은 10030원이에요">
             <span class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500">원</span>
           </div>
@@ -103,19 +77,6 @@
             type="date"
             required
             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent transition">
-        </div>
-
-        <!-- 근로 종료일 -->
-        <div class="mb-6">
-          <label for="end_date" class="block text-sm font-semibold text-gray-900 mb-2">
-            근로 종료일
-          </label>
-          <input
-            id="end_date"
-            v-model="formData.end_date"
-            type="date"
-            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent transition">
-          <p class="text-xs text-gray-500 mt-1">현재 재직 중인 경우 비워두세요.</p>
         </div>
 
         <!-- 주간 스케줄 편집기 -->
@@ -165,12 +126,9 @@ const { fetchJobSummary, getMonthString, fetchEvaluation } = useLabor()
 // 폼 데이터
 const formData = reactive({
   workplace_name: '',
-  workplace_address: '',
   workplace_reg_no: '',
-  industry: '',
   employment_type: '',
   start_date: '',
-  end_date: '',
   hourly_rate: 0,
   // 평가 추가 필드
   attendance_rate_last_year: null as number | null,
@@ -198,12 +156,9 @@ async function loadFormData() {
       const response = await apiClient.get(`/labor/employees/${activeJob.value.id}/`)
       const data = response.data
       formData.workplace_name = data.workplace_name || ''
-      formData.workplace_address = data.workplace_address || ''
       formData.workplace_reg_no = data.workplace_reg_no || ''
-      formData.industry = data.industry || ''
       formData.employment_type = data.employment_type || ''
       formData.start_date = data.start_date || ''
-      formData.end_date = data.end_date || ''
       formData.hourly_rate = parseFloat(data.hourly_rate) || 0
       formData.attendance_rate_last_year = data.attendance_rate_last_year ?? null
       formData.total_wage_last_3m = data.total_wage_last_3m ?? null
@@ -264,6 +219,7 @@ async function submitForm() {
     return
   }
 
+  const scheduleSnapshot = weeklyScheduleEditorRef.value?.exportSchedules?.()
   submitError.value = null
   isSubmitting.value = true
 
@@ -271,9 +227,7 @@ async function submitForm() {
     // Prepare payload by copying and normalizing date fields
     const payload: any = {
       workplace_name: formData.workplace_name,
-      workplace_address: formData.workplace_address,
       workplace_reg_no: formData.workplace_reg_no,
-      industry: formData.industry,
       employment_type: formData.employment_type,
       hourly_rate: formData.hourly_rate,
       attendance_rate_last_year: formData.attendance_rate_last_year,
@@ -283,11 +237,8 @@ async function submitForm() {
 
     // Normalize dates
     const sd = formatDateForApi(formData.start_date)
-    const ed = formatDateForApi(formData.end_date)
     // start_date is required
     payload.start_date = sd
-    // end_date: if empty/null -> send null
-    payload.end_date = ed // ed will be null if empty or unparsable
 
     if (activeJob.value) {
       await apiClient.patch(`/labor/employees/${activeJob.value.id}/`, payload)
@@ -309,15 +260,16 @@ async function submitForm() {
         
         // 새로 생성된 employee ID로 스케줄 저장 시도
         // 약간의 딜레이를 줘서 prop이 업데이트되도록 함
-        setTimeout(async () => {
-          try {
-            if (weeklyScheduleEditorRef.value) {
-              await weeklyScheduleEditorRef.value.saveSchedules()
-            }
-          } catch (schedErr) {
-            console.warn('스케줄 저장 중 오류 발생:', schedErr)
+        try {
+          if (weeklyScheduleEditorRef.value) {
+            await weeklyScheduleEditorRef.value.saveSchedules({
+              schedules: scheduleSnapshot || undefined,
+              employeeId: created.id
+            })
           }
-        }, 100)
+        } catch (schedErr) {
+          console.warn('스케줄 저장 중 오류 발생:', schedErr)
+        }
       }
     }
 
@@ -345,8 +297,10 @@ async function submitForm() {
     // 저장 성공 알림 표시
     alert('근로정보가 저장되었습니다.')
     
-    // 근로관리 페이지로 이동
-    router.push('/dashboard?section=labor')
+    // 근로관리 페이지로 이동 (이벤트 처리 시간을 위해 약간의 지연)
+    setTimeout(() => {
+      router.push('/dashboard?section=labor')
+    }, 100)
   } catch (err: any) {
     console.error('Failed to save employee data:', err)
     const detail = err?.response?.data?.detail
@@ -381,4 +335,13 @@ watch(activeJob, (newVal, oldVal) => {
 </script>
 
 <style scoped>
+/* 시급 입력 스피너 제거 & 우측 단위와 겹침 방지 */
+#hourly_rate::-webkit-outer-spin-button,
+#hourly_rate::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+#hourly_rate[type=number] {
+  -moz-appearance: textfield; /* Firefox */
+}
 </style>

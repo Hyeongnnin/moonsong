@@ -31,6 +31,27 @@
             </p>
           </div>
 
+          <!-- 주휴일 및 기본 휴게 설정 -->
+          <div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm text-gray-700 mb-1">주휴일 요일</label>
+              <select v-model="weeklyRestDay" class="w-full px-3 py-2 border rounded">
+                <option :value="null">선택 없음</option>
+                <option v-for="d in weekdays" :key="d.value" :value="d.value">{{ d.label }}</option>
+              </select>
+            </div>
+            <div class="text-sm text-gray-600">
+              각 요일의 기본 휴게시간(분)을 입력하면, 해당 달의 생성되는 근로기록에 참고값으로 저장됩니다.
+            </div>
+          </div>
+
+          <div class="space-y-3">
+            <div v-for="d in weekdays" :key="d.value" class="flex items-center gap-3">
+              <div class="w-16 text-sm font-medium">{{ d.label }}</div>
+              <input type="number" min="0" v-model.number="defaultBreaks[d.value]" class="w-24 px-2 py-1 border rounded" placeholder="휴게(분)" />
+            </div>
+          </div>
+
           <div class="space-y-3">
             <div v-for="d in weekdays" :key="d.value" class="flex items-center gap-3">
               <div class="w-16 text-sm font-medium">{{ d.label }}</div>
@@ -92,7 +113,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: []
-  saved: []
+  saved: [data?: { stats?: any; dates?: any; cumulative_stats?: any }]
 }>()
 
 const weekdays = [
@@ -130,6 +151,10 @@ const localSchedules = reactive<Record<number, ScheduleData>>({
 
 const hasOverride = ref(false)
 const isSaving = ref(false)
+const weeklyRestDay = ref<number | null>(null)
+const defaultBreaks = reactive<Record<number, number>>({
+  0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0
+})
 
 // 모달이 열릴 때 현재 스케줄 로드
 watch(() => props.isOpen, async (newVal) => {
@@ -164,6 +189,20 @@ async function loadSchedules() {
         end_time: schedule.end_time || '18:00'
       }
     })
+
+    // 월별 메타 데이터 (존재하는 경우 첫 항목에서 로드)
+    const metaSource = schedules.find((s: any) => s.default_break_minutes_by_weekday || s.weekly_rest_day)
+    if (metaSource) {
+      const breaksMap = metaSource.default_break_minutes_by_weekday || {}
+      weekdays.forEach(w => {
+        defaultBreaks[w.value] = breaksMap[w.value] ?? 0
+      })
+      weeklyRestDay.value = typeof metaSource.weekly_rest_day === 'number' ? metaSource.weekly_rest_day : null
+    } else {
+      // 기본값 리셋
+      weekdays.forEach(w => { defaultBreaks[w.value] = 0 })
+      weeklyRestDay.value = null
+    }
   } catch (error) {
     console.error('Failed to load monthly schedule:', error)
     alert('스케줄을 불러오는데 실패했습니다.')
@@ -173,7 +212,7 @@ async function loadSchedules() {
 async function saveSchedules() {
   if (!props.employeeId) return
   
-  if (!confirm(`${props.year}년 ${props.month}월 근무 스케줄을 저장하시겠습니까?`)) {
+  if (!confirm(`${props.year}년 ${props.month}월 근무 스케줄을 저장하시겠습니까?\n\n스케줄에 맞춰 근로기록이 자동으로 생성됩니다.`)) {
     return
   }
   
@@ -187,17 +226,28 @@ async function saveSchedules() {
       enabled: data.enabled
     }))
     
-    await apiClient.post(
+    const response = await apiClient.post(
       `/labor/employees/${props.employeeId}/monthly-schedule-override/`,
       {
         year: props.year,
         month: props.month,
-        schedules: schedulesArray
+        schedules: schedulesArray,
+        default_break_minutes_by_weekday: { ...defaultBreaks },
+        weekly_rest_day: weeklyRestDay.value
       }
     )
     
-    alert(`${props.year}년 ${props.month}월 근무 스케줄이 저장되었습니다.`)
-    emit('saved')
+    const createdCount = response.data.created_records || 0
+    const message = response.data.message || `${props.year}년 ${props.month}월 근무 스케줄이 저장되었습니다.`
+    
+    alert(message)
+    
+    // 통계 데이터가 포함되어 있으면 부모 컴포넌트에 전달
+    emit('saved', {
+      stats: response.data.stats,
+      dates: response.data.dates,
+      cumulative_stats: response.data.cumulative_stats
+    })
     close()
   } catch (error) {
     console.error('Failed to save monthly schedule:', error)

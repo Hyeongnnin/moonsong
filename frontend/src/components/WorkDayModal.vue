@@ -7,6 +7,20 @@
       </div>
 
       <div class="space-y-4">
+        <div
+          v-if="holidayName"
+          class="flex items-center gap-2 text-sm font-semibold text-red-600 bg-red-50 border border-red-100 rounded px-3 py-2"
+        >
+          <span>🎌 법정공휴일 근무</span>
+          <span class="truncate">{{ holidayName }}</span>
+        </div>
+        <div
+          v-else-if="weeklyRestName"
+          class="flex items-center gap-2 text-sm font-semibold text-sky-700 bg-sky-50 border border-sky-100 rounded px-3 py-2"
+        >
+          <span>🛌 주휴일 근무</span>
+          <span class="truncate">{{ weeklyRestName }}</span>
+        </div>
         <div>
           <label class="block text-sm text-gray-700 mb-1">출근 시간</label>
           <TimeSelect 
@@ -23,9 +37,48 @@
             class="w-full"
           />
         </div>
+        <div class="flex items-center gap-2">
+          <input id="preciseBreaks" type="checkbox" v-model="usePreciseBreaks" />
+          <label for="preciseBreaks" class="text-sm text-gray-700">정확 계산(선택): 휴게구간 입력</label>
+        </div>
         <div>
           <label class="block text-sm text-gray-700 mb-1">휴게(분)</label>
           <input type="number" v-model.number="breakMinutes" min="0" class="w-full px-3 py-2 border rounded" />
+        </div>
+        <div v-if="usePreciseBreaks" class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm text-gray-700 mb-1">휴게 시작</label>
+            <TimeSelect 
+              v-model="breakStart"
+              :options="timeOptions"
+              class="w-full"
+            />
+          </div>
+          <div>
+            <label class="block text-sm text-gray-700 mb-1">휴게 종료</label>
+            <TimeSelect 
+              v-model="breakEnd"
+              :options="timeOptions"
+              class="w-full"
+            />
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm text-gray-700 mb-1">근무 유형</label>
+            <select v-model="dayType" class="w-full px-3 py-2 border rounded">
+              <option value="NORMAL">일반근무</option>
+              <option value="HOLIDAY_WORK">휴일근무</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-700 mb-1">출결 유형</label>
+            <select v-model="attendanceType" class="w-full px-3 py-2 border rounded">
+              <option value="WORKED">근무</option>
+              <option value="APPROVED_LEAVE">승인된 휴무</option>
+              <option value="ABSENT">결근</option>
+            </select>
+          </div>
         </div>
         <div v-if="error" class="text-sm text-red-600">{{ error }}</div>
       </div>
@@ -57,7 +110,9 @@ const props = defineProps({
   visible: { type: Boolean, required: true },
   employeeId: { type: Number, required: false, default: null },
   dateIso: { type: String, required: true },
-  record: { type: Object as () => any, required: false, default: null }
+  record: { type: Object as () => any, required: false, default: null },
+  holidayName: { type: String, required: false, default: null },
+  weeklyRestName: { type: String, required: false, default: null }
 })
 
 const emit = defineEmits(['close', 'saved', 'deleted'])
@@ -65,6 +120,11 @@ const emit = defineEmits(['close', 'saved', 'deleted'])
 const timeIn = ref<string | null>(null)
 const timeOut = ref<string | null>(null)
 const breakMinutes = ref<number>(0)
+const usePreciseBreaks = ref<boolean>(false)
+const breakStart = ref<string | null>(null)
+const breakEnd = ref<string | null>(null)
+const dayType = ref<string>('NORMAL')
+const attendanceType = ref<string>('WORKED')
 const error = ref<string | null>(null)
 const hasSchedule = ref(false)
 const hasWorkRecord = computed(() => {
@@ -129,12 +189,32 @@ watch(() => props.record, (r) => {
     timeIn.value = roundToNearest30(rawIn);
     timeOut.value = roundToNearest30(rawOut);
     breakMinutes.value = r.break_minutes || 0;
+    // 휴게 구간 기록 반영
+    const rawBreakStart = r.break_start ? r.break_start.split('T')[1].slice(0,5) : null
+    const rawBreakEnd = r.break_end ? r.break_end.split('T')[1].slice(0,5) : null
+    if (rawBreakStart && rawBreakEnd) {
+      usePreciseBreaks.value = true
+      breakStart.value = roundToNearest30(rawBreakStart)
+      breakEnd.value = roundToNearest30(rawBreakEnd)
+    } else {
+      usePreciseBreaks.value = false
+      breakStart.value = null
+      breakEnd.value = null
+    }
+    // 근무/출결 유형
+    dayType.value = r.day_type || 'NORMAL'
+    attendanceType.value = r.attendance_type || 'WORKED'
     hasSchedule.value = false;
   } else {
     // 근로기록도 스케줄도 없음
     timeIn.value = null;
     timeOut.value = null;
     breakMinutes.value = 0;
+    usePreciseBreaks.value = false
+    breakStart.value = null
+    breakEnd.value = null
+    dayType.value = 'NORMAL'
+    attendanceType.value = 'WORKED'
     hasSchedule.value = false;
   }
 }, { immediate: true })
@@ -170,12 +250,25 @@ async function onSave() {
   const payload: any = {
     employee: props.employeeId,
     work_date: date,
-    break_minutes: breakMinutes.value || 0
+    break_minutes: breakMinutes.value || 0,
+    day_type: dayType.value,
+    attendance_type: attendanceType.value
   }
   if (timeIn.value) payload.time_in = `${date}T${timeIn.value}:00`
   else payload.time_in = null
   if (timeOut.value) payload.time_out = `${date}T${timeOut.value}:00`
   else payload.time_out = null
+  // 정밀 휴게구간 사용 시 break_start/break_end 전달
+  if (usePreciseBreaks.value && breakStart.value && breakEnd.value) {
+    payload.break_start = `${date}T${breakStart.value}:00`
+    payload.break_end = `${date}T${breakEnd.value}:00`
+    payload.break_intervals = null
+  } else {
+    payload.break_start = null
+    payload.break_end = null
+    // intervals는 UI 미지원 (복수 구간은 추후)
+    payload.break_intervals = null
+  }
 
   console.log('[WorkDayModal] Saving with payload:', payload);
 
