@@ -30,13 +30,31 @@
         :class="isFutureMonth ? 'bg-gray-50 border-gray-100' : 'bg-brand-50 border-brand-100'"
       >
         <div>
-          <p class="text-sm font-medium text-gray-700">총 인정 시간</p>
-          <p class="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-tighter">
-            {{ monthLabel }} 누적
-          </p>
+          <p class="text-sm font-medium text-gray-700">일한 시간</p>
         </div>
         <div class="text-right">
           <p class="text-xl font-bold" :class="isFutureMonth ? 'text-gray-400' : 'text-brand-600'">{{ monthlyTotalHours.toFixed(1) }}시간</p>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between p-4 bg-orange-50 bg-opacity-40 rounded-lg border border-orange-100">
+        <div>
+          <p class="text-sm font-medium text-orange-900">주휴수당</p>
+          <p class="text-[10px] font-bold text-orange-400 mt-1 uppercase tracking-tighter">주 15시간 이상 & 개근</p>
+        </div>
+        <div class="text-right">
+          <p class="text-lg font-bold text-orange-700">{{ weeklyHolidayHours.toFixed(1) }}시간</p>
+          <p class="text-xs font-semibold text-orange-500">+ {{ formatCurrency(weeklyHolidayPay) }}</p>
+        </div>
+      </div>
+
+      <div v-if="nightHours > 0 || (monthlyPayroll?.night_bonus && monthlyPayroll.night_bonus > 0)" class="flex items-center justify-between p-4 bg-indigo-50 bg-opacity-40 rounded-lg border border-indigo-100">
+        <div>
+          <p class="text-sm font-medium text-indigo-900">야간 근로시간</p>
+          <p class="text-[10px] font-bold text-indigo-400 mt-1 uppercase tracking-tighter">22:00 ~ 06:00 가산</p>
+        </div>
+        <div class="text-right">
+          <p class="text-lg font-bold text-indigo-700">{{ nightHours.toFixed(1) }}시간</p>
         </div>
       </div>
 
@@ -50,38 +68,16 @@
         <div class="text-left">
           <p class="text-sm font-medium text-gray-700">급여 예상액</p>
           <p class="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-tighter">
-            {{ monthLabel }} 예상
+            {{ netPayLabel }}
           </p>
         </div>
-        <p class="text-xl font-bold text-gray-600">{{ formatCurrency(monthlyEstimatedSalary) }}</p>
+        <div class="text-right">
+          <p class="text-xl font-bold text-gray-600">{{ formatCurrency(monthlyEstimatedSalary) }}</p>
+          <p v-if="isDeducted" class="text-[10px] text-gray-400 line-through">{{ formatCurrency(monthlyGrossPay) }}</p>
+        </div>
       </button>
 
-      <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-        <div>
-          <p class="text-sm font-medium text-gray-700">실제 근로시간</p>
-          <p class="text-xs text-gray-400 mt-1">기록된 확정 시간</p>
-        </div>
-        <p class="text-xl font-bold text-gray-600">{{ actualHours.toFixed(1) }}시간</p>
-      </div>
 
-      <div v-if="nightHours > 0 || (monthlyPayroll?.night_bonus && monthlyPayroll.night_bonus > 0)" class="flex items-center justify-between p-4 bg-indigo-50 bg-opacity-40 rounded-lg border border-indigo-100">
-        <div>
-          <p class="text-sm font-medium text-indigo-900">야간 근로 및 수당</p>
-          <p class="text-[10px] font-bold text-indigo-400 mt-1 uppercase tracking-tighter">22:00 ~ 06:00 가산</p>
-        </div>
-        <div class="text-right">
-          <p class="text-lg font-bold text-indigo-700">{{ nightHours.toFixed(1) }}시간</p>
-          <p class="text-xs font-semibold text-indigo-500">+ {{ formatCurrency(nightBonus) }}</p>
-        </div>
-      </div>
-
-      <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg border-dashed border-2 border-gray-100">
-        <div>
-          <p class="text-sm font-medium text-gray-700">예정 근로시간</p>
-          <p class="text-xs text-gray-400 mt-1">스케줄 기준 합계</p>
-        </div>
-        <p class="text-xl font-bold text-gray-400">{{ scheduledHours.toFixed(1) }}시간</p>
-      </div>
 
       <!-- 미래 달 안내 문구 -->
       <div v-if="isFutureMonth" class="mt-4 p-3 bg-blue-50 bg-opacity-50 rounded-lg border border-blue-100">
@@ -138,11 +134,18 @@ interface PayrollSummaryResponse {
   night_hours: number;
   night_bonus: number;
   estimated_monthly_pay: number;
+  net_pay: number;
   summary: {
     base_pay: number;
     night_extra: number;
     holiday_extra: number;
     total: number;
+    deduction?: {
+      type: string;
+      total_deduction: number;
+      net_pay: number;
+      details: Array<{ label: string; amount: number }>;
+    };
   };
   rows: PayrollBreakdownItem[];
   notes: string[];
@@ -157,9 +160,26 @@ const props = withDefaults(defineProps<Props>(), {
 const monthlyTotalHours = ref(0);
 const actualHours = ref(0);
 const scheduledHours = ref(0);
-const monthlyEstimatedSalary = ref(0);
+const monthlyEstimatedSalary = computed(() => {
+  return monthlyPayroll.value?.net_pay ?? monthlyPayroll.value?.estimated_monthly_pay ?? 0;
+});
+const monthlyGrossPay = computed(() => monthlyPayroll.value?.estimated_monthly_pay ?? 0);
+
+const isDeducted = computed(() => {
+  const type = monthlyPayroll.value?.summary?.deduction?.type;
+  return type === 'FOUR_INSURANCE' || type === 'FREELANCE';
+});
+
+const netPayLabel = computed(() => {
+  const type = monthlyPayroll.value?.summary?.deduction?.type;
+  if (type === 'FOUR_INSURANCE') return '4대보험 적용 예상 실수령액';
+  if (type === 'FREELANCE') return '3.3% 공제 적용 예상 실수령액';
+  return '상세보기 (세전)';
+});
 const nightHours = ref(0);
 const nightBonus = ref(0);
+const weeklyHolidayHours = ref(0);
+const weeklyHolidayPay = ref(0);
 const monthlyPayroll = ref<PayrollSummaryResponse | null>(null);
 const breakdownModalVisible = ref(false);
 
@@ -227,21 +247,34 @@ async function loadJobSummary() {
     
     console.log('[WorkSummaryCard] Loading summary for month:', monthStr);
     
-    const res = await apiClient.get(`/labor/jobs/${employeeId}/payroll-summary/`, {
-      params: { month: monthStr }
-    });
+    // 두 API 동시 호출
+    const [payrollRes, holidayRes] = await Promise.all([
+      apiClient.get(`/labor/jobs/${employeeId}/payroll-summary/`, { params: { month: monthStr } }),
+      apiClient.get(`/labor/employees/${employeeId}/monthly-holiday-pay/`, { params: { month: monthStr } }).catch(() => ({ data: { confirmed_total: 0 } }))
+    ]);
 
-    const payload = res.data as PayrollSummaryResponse;
+    const payload = payrollRes.data as PayrollSummaryResponse;
     monthlyPayroll.value = payload;
 
     // Use summary-nested fields if available (v2), otherwise fallback to top-level (v1)
     monthlyTotalHours.value = payload?.summary?.total_hours ?? payload?.total_hours ?? 0;
     actualHours.value = payload?.actual_hours || 0;
     scheduledHours.value = payload?.summary?.scheduled_hours ?? payload?.scheduled_hours ?? 0;
-    monthlyEstimatedSalary.value = payload?.summary?.total ?? payload?.estimated_monthly_pay ?? 0;
     
     nightHours.value = payload?.night_hours || 0;
     nightBonus.value = payload?.summary?.night_extra ?? payload?.night_bonus ?? 0;
+
+    // 주휴수당 처리
+    const holidayData = holidayRes.data;
+    weeklyHolidayPay.value = holidayData.confirmed_total || 0;
+    // 시급으로 시간 역산 (데이터가 없으면 0)
+    const wage = payload.hourly_wage || props.activeJob?.hourly_wage || 0;
+    if (weeklyHolidayPay.value > 0 && wage > 0) {
+      weeklyHolidayHours.value = weeklyHolidayPay.value / wage;
+    } else {
+      weeklyHolidayHours.value = 0;
+    }
+
   } catch (e) {
     console.error('[WorkSummaryCard] Failed to load job summary', e);
     clearStats();
@@ -252,9 +285,11 @@ function clearStats() {
     monthlyTotalHours.value = 0;
     actualHours.value = 0;
     scheduledHours.value = 0;
-    monthlyEstimatedSalary.value = 0;
+
     nightHours.value = 0;
     nightBonus.value = 0;
+    weeklyHolidayHours.value = 0;
+    weeklyHolidayPay.value = 0;
     monthlyPayroll.value = null;
 }
 

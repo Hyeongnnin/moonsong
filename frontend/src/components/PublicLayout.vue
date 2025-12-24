@@ -1,7 +1,13 @@
 <template>
   <div>
     <Header current-page="landing" @navigate="onNavigate" />
-    <main class="pt-16">
+    <header class="h-20" /> <!-- Added space for the fixed header -->
+    <main class="pt-4">
+
+
+
+
+
       <router-view v-slot="{ Component }">
         <component :is="Component" @navigate="onNavigate" @logged-in="onLoggedIn" />
       </router-view>

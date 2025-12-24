@@ -126,3 +126,83 @@ class LogoutView(APIView):
         except Exception as e:
             # 토큰이 유효하지 않거나 이미 블랙리스트에 있는 경우
             return Response({'detail': '로그아웃 되었습니다.'}, status=status.HTTP_200_OK)
+
+class FindIDView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        email = request.data.get('email')
+        name = request.data.get('name')
+
+        if not email or not name:
+            return Response({'detail': '이름과 이메일을 모두 입력해주세요.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 이름과 이메일로 사용자 찾기 (여러 명일 수 있음)
+        users = User.objects.filter(nickname=name, email=email)
+        if not users.exists():
+            # 보안상 "정보가 없습니다"라고 하기보다 모호하게 처리하거나, 편의상 명시할 수도 있음.
+            # 여기서는 편의상 명시.
+            return Response({'detail': '일치하는 사용자 정보를 찾을 수 없습니다.'}, status=status.HTTP_404_NOT_FOUND)
+
+        found_ids = []
+        for user in users:
+            username = user.username
+            # 마스킹 처리 (앞 2글자 제외하고 * 처리, 혹은 뒤 3글자 등)
+            if len(username) > 2:
+                masked = username[:2] + '*' * (len(username) - 2)
+            else:
+                masked = username[:1] + '*'
+            found_ids.append(masked)
+
+        return Response({'ids': found_ids}, status=status.HTTP_200_OK)
+
+
+class VerifyUserView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        username = request.data.get('username')
+        email = request.data.get('email')
+        name = request.data.get('name')
+
+        if not username or not email or not name:
+            return Response({'detail': '아이디, 이름, 이메일을 모두 입력해주세요.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # 일치하는 사용자 존재 여부 확인
+            user = User.objects.get(username=username, email=email, nickname=name)
+            return Response({'detail': '사용자 확인 성공'}, status=status.HTTP_200_OK)
+        except User.DoesNotExist:
+            return Response({'detail': '일치하는 사용자 정보를 찾을 수 없습니다.'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class ResetPasswordView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        username = request.data.get('username')
+        email = request.data.get('email')
+        name = request.data.get('name')
+        new_password = request.data.get('new_password')
+        new_password_confirm = request.data.get('new_password_confirm')
+
+        if not all([username, email, name, new_password, new_password_confirm]):
+            return Response({'detail': '모든 필드를 입력해주세요.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = User.objects.get(username=username, email=email, nickname=name)
+        except User.DoesNotExist:
+            return Response({'detail': '일치하는 사용자 정보를 찾을 수 없습니다.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if new_password != new_password_confirm:
+            return Response({'detail': '새 비밀번호가 일치하지 않습니다.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            validate_password(new_password, user)
+        except Exception as e:
+            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.set_password(new_password)
+        user.save()
+
+        return Response({'detail': '비밀번호가 성공적으로 변경되었습니다. 새 비밀번호로 로그인해주세요.'}, status=status.HTTP_200_OK)

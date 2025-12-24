@@ -39,14 +39,16 @@
       <table class="career-table">
         <thead>
           <tr>
-            <th class="col-date">년 월 일</th>
+            <th class="col-start">시작일</th>
+            <th class="col-end">종료일</th>
             <th class="col-content">학력 및 경력사항</th>
-            <th class="col-note">발령청(비고)</th>
+            <th class="col-note">기관명</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="(career, idx) in displayCareers" :key="idx">
-            <td class="text-center">{{ career.date || '\u00A0' }}</td>
+            <td class="text-center">{{ career.startDate || '\u00A0' }}</td>
+            <td class="text-center">{{ career.endDate || '\u00A0' }}</td>
             <td>{{ career.content || '\u00A0' }}</td>
             <td>{{ career.note || '\u00A0' }}</td>
           </tr>
@@ -73,7 +75,8 @@
 import { computed, ref } from 'vue'
 
 interface CareerRow {
-  date: string
+  startDate: string
+  endDate: string
   content: string
   note: string
 }
@@ -101,7 +104,7 @@ const displayCareers = computed(() => {
   const minRows = 10
   const filled = [...careers]
   while (filled.length < minRows) {
-    filled.push({ date: '', content: '', note: '' })
+    filled.push({ startDate: '', endDate: '', content: '', note: '' })
   }
   return filled
 })
@@ -212,12 +215,15 @@ defineExpose({
   width: 20%;
 }
 
-.career-table .col-date {
-  width: 18%;
+.career-table .col-start {
+  width: 12%; 
+}
+.career-table .col-end {
+  width: 12%; 
 }
 
 .career-table .col-content {
-  width: 52%;
+  width: 46%; 
 }
 
 .career-table .col-note {

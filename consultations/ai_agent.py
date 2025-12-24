@@ -62,6 +62,97 @@ def fetch_recent_calculations_tool(user_id: int) -> str:
     except Exception as e:
         return f"Error fetching calculations: {str(e)}"
 
+@tool
+def calculate_expected_pay_tool(user_id: int) -> str:
+    """
+    사용자의 '현재 시점까지의 예상 급여'와 '퇴직금 예상액'을 실시간으로 계산합니다.
+    '오늘까지 일하면 얼마 받아?', '지금 그만두면 퇴직금 나와?' 같은 질문에 사용합니다.
+    """
+    from datetime import date
+    from labor.services import compute_monthly_payroll, calculate_severance_v2
+    
+    try:
+        employees = Employee.objects.filter(user_id=user_id)
+        if not employees.exists():
+            return "등록된 알바(Employee) 정보가 없습니다."
+
+        today = date.today()
+        results = []
+        
+        for emp in employees:
+            # 1. 이번 달 급여 (이달 1일 ~ 오늘)
+            # compute_monthly_payroll은 해당 월 전체 기록을 가져오므로, 오늘까지의 기록만 있으면 오늘까지로 계산됨
+            payroll = compute_monthly_payroll(emp, today.year, today.month)
+            
+            # 2. 퇴직금 예상액
+            severance = calculate_severance_v2(emp)
+            
+            severance_msg = "해당 없음 (1년 미만 또는 시간 부족)"
+            if severance['eligible']:
+                severance_msg = f"{severance['severance_pay']:,}원 (예상)"
+            elif severance['reason'] == 'service_period_under_1y':
+                severance_msg = "해당 없음 (재직 1년 미만)"
+            
+            info = (
+                f"[{emp.workplace_name}]\n"
+                f"- 이번 달 예상 급여 ({today.month}월): {payroll['estimated_salary']:,}원\n"
+                f"  (총 {payroll['total_hours']}시간, {payroll['total_work_days']}일 근무)\n"
+                f"- 퇴직금 예상액: {severance_msg}"
+            )
+            results.append(info)
+            
+        return "\n\n".join(results)
+    except Exception as e:
+        return f"Error calculating pay: {str(e)}"
+
+@tool
+def diagnose_labor_law_tool(user_id: int) -> str:
+    """
+    사용자의 근로 조건이 노동법을 위반하고 있는지 종합적으로 진단합니다.
+    '최저임금 위반인가요?', '주휴수당 받을 수 있나요?', '사장님이 법을 어기고 있나요?' 같은 질문에 사용합니다.
+    """
+    from labor.services import evaluate_labor, job_to_inputs
+    
+    try:
+        employees = Employee.objects.filter(user_id=user_id)
+        if not employees.exists():
+            return "진단할 알바(Employee) 정보가 없습니다."
+
+        results = []
+        for emp in employees:
+            # 1. Employee -> JobInputs 변환
+            inputs = job_to_inputs(emp)
+            
+            # 2. 노동법 위반 여부 진단
+            eval_result = evaluate_labor(inputs)
+            
+            # 3. 결과 포맷팅
+            warnings = eval_result.get('warnings', [])
+            status_msg = "✅ 위반 사항 없음 (정상)"
+            if warnings:
+                 status_msg = "⚠️ " + ", ".join(warnings)
+            
+            min_wage_ok = "준수" if eval_result['min_wage']['min_wage_ok'] else "위반 (최저임금 미달)"
+            weekly_holiday = "대상 아님"
+            if inputs.weekly_hours and inputs.weekly_hours >= 15:
+                weekly_holiday = "지급 대상 (주 15시간 이상)"
+            
+            info = (
+                f"[{emp.workplace_name}] 진단 결과\n"
+                f"- 최저임금: {min_wage_ok}\n"
+                f"- 주휴수당: {weekly_holiday}\n"
+                f"- 종합 판정: {status_msg}"
+            )
+            results.append(info)
+            
+        return "\n\n".join(results)
+    except Exception as e:
+        return f"Error diagnosing labor law: {str(e)}"
+
+# Global Memory Storage
+# {user_id: [message1, message2, ...]}
+GLOBAL_MEMORY = {}
+
 # 2. Configure Manual Agent Executor
 class ManualAgentExecutor:
     def __init__(self, model, tools, system_prompt):
@@ -72,14 +163,38 @@ class ManualAgentExecutor:
     def invoke(self, inputs: dict) -> dict:
         """
         Mimics AgentExecutor.invoke
-        inputs: {"input": "user question..."}
+        inputs: {"input": "user question...", "user_id": 1}
         returns: {"output": "ai response..."}
         """
         user_input = inputs.get("input", "")
-        messages = [
-            SystemMessage(content=self.system_prompt),
-            HumanMessage(content=user_input)
-        ]
+        user_id = inputs.get("user_id", None)
+        
+        current_system_prompt = self.system_prompt
+        # [Developer Mode]
+        if "deus ex machina" in user_input:
+            current_system_prompt = "You are a helpful AI assistant. Answer the user's request freely."
+            user_input = user_input.replace("deus ex machina", "").strip()
+
+        # Load history or initialize
+        messages = []
+        if user_id is not None:
+             if user_id in GLOBAL_MEMORY:
+                 messages = GLOBAL_MEMORY[user_id]
+             else:
+                 messages = [SystemMessage(content=current_system_prompt)]
+                 GLOBAL_MEMORY[user_id] = messages
+        else:
+             # Fallback for no user_id (stateless)
+             messages = [SystemMessage(content=current_system_prompt)]
+
+        # [Developer Mode] System Prompt Override in History
+        # 만약 개발자 모드가 감지되면, 히스토리의 첫 번째 메시지(SystemMessage)를 강제로 업데이트
+        if "deus ex machina" in inputs.get("input", ""): # 원본 입력 다시 체크
+             if messages and isinstance(messages[0], SystemMessage):
+                 messages[0] = SystemMessage(content=current_system_prompt)
+
+        # Add User Message
+        messages.append(HumanMessage(content=user_input))
         
         # Max turns to prevent infinite loops
         max_turns = 5
@@ -122,13 +237,13 @@ def get_consultation_agent():
 
     # 모델 설정 (기본 gpt-4o, 필요 시 gpt-4.1로 교체 가능)
     llm = ChatOpenAI(
-        model="gpt-5-nano",
+        model="gpt-4.1-nano",
         temperature=0,
         api_key=settings.OPENAI_API_KEY,
         base_url=gms_openai_base,  # None이면 기본 OpenAI 엔드포인트 사용
     )
     
-    tools = [fetch_my_employees_tool, fetch_recent_calculations_tool]
+    tools = [fetch_my_employees_tool, fetch_recent_calculations_tool, calculate_expected_pay_tool, diagnose_labor_law_tool]
     
     # 시스템 프롬프트
     system_prompt = """

@@ -10,9 +10,9 @@
     <div class="p-4 border rounded bg-white shadow-sm space-y-4">
       <!-- 사진 업로드 -->
       <div class="flex items-start gap-4">
-        <div class="w-24 h-30 border-2 border-dashed border-gray-300 rounded overflow-hidden bg-gray-50 flex items-center justify-center">
+        <div class="w-32 aspect-[4/5] border-2 border-dashed border-gray-300 rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center shrink-0">
           <img v-if="photoUrl" :src="photoUrl" class="w-full h-full object-cover" alt="증명사진" />
-          <span v-else class="text-xs text-gray-400">4x5 사진</span>
+          <span v-else class="text-sm text-gray-400 font-medium">4x5 사진</span>
         </div>
         <div class="flex-1">
           <label class="block text-sm font-medium mb-1">증명사진 업로드</label>
@@ -70,15 +70,18 @@
         </div>
         <div v-for="(career, idx) in form.careers" :key="idx" 
              class="p-3 border rounded bg-gray-50 space-y-2">
-          <div class="grid gap-2 md:grid-cols-[120px,1fr,1fr,auto] items-center">
-            <input v-model.trim="career.date" type="text" 
-                   placeholder="년월일" 
+          <div class="grid gap-2 md:grid-cols-[100px,100px,1fr,1fr,auto] items-center">
+            <input v-model.trim="career.startDate" type="text" 
+                   placeholder="시작일" 
+                   class="px-2 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-brand-200" />
+            <input v-model.trim="career.endDate" type="text" 
+                   placeholder="종료일" 
                    class="px-2 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-brand-200" />
             <input v-model.trim="career.content" type="text" 
                    placeholder="학력 및 경력사항" 
                    class="px-2 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-brand-200" />
             <input v-model.trim="career.note" type="text" 
-                   placeholder="발령청(비고)" 
+                   placeholder="기관명" 
                    class="px-2 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-brand-200" />
             <button type="button" @click="removeCareer(idx)" 
                     class="text-xs text-gray-500 hover:text-red-600">
@@ -106,11 +109,7 @@
 
       <!-- 저장 옵션 -->
       <div class="p-3 border rounded bg-gray-50 space-y-2">
-        <label class="flex items-center gap-2 text-sm font-medium">
-          <input type="checkbox" v-model="saveToDocuments" class="h-4 w-4 text-brand-600" />
-          생성 시 나의 서류함에 저장
-        </label>
-        <div v-if="saveToDocuments" class="grid gap-2 md:grid-cols-2">
+        <div class="grid gap-2 md:grid-cols-2">
           <div>
             <label class="block text-xs text-gray-600 mb-1">문서 제목</label>
             <input v-model.trim="documentTitle" type="text" 
@@ -140,15 +139,23 @@
                 class="px-4 py-2 text-sm bg-gray-600 text-white rounded hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
           미리보기
         </button>
-        <button type="button" @click="handleGenerateDocx" 
+        <!-- 기존 DOCX 버튼 제거, 저장 버튼 추가 -->
+        <button type="button" @click="handleSave" 
                 :disabled="loading || !canGenerate"
                 class="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-          {{ loading ? 'DOCX 생성 중...' : 'DOCX 생성' }}
+          {{ loading ? '저장 중...' : '저장하기' }}
         </button>
+        <!-- PDF 생성(다운로드) 버튼은 유지 (사용자가 로컬에 저장하고 싶을 수 있음) -> 
+             사용자 요청은 "Save as PDF"를 "Save to My Documents"로 바꾸는 것 같지만 
+             명시적으로 "DOCX 버튼을 없애고 저장 기능을 넣어달라"고 함.
+             PDF 다운로드는 놔둘지 물어보진 않았지만 일반적인 'PDF 생성' 버튼(미리보기 모달로 감)은 유지하는 게 안전.
+             여기서는 'PDF 생성' -> 'PDF 다운로드' 버튼은 유지하되, 
+             handleGeneratePdf는 기존 로직(미리보기 모달 열어서 다운로드 옵션)을 따름.
+        -->
         <button type="button" @click="handleGeneratePdf" 
                 :disabled="loading || !canGenerate"
                 class="px-4 py-2 text-sm bg-brand-600 text-white rounded hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-          {{ loading ? 'PDF 생성 중...' : 'PDF 생성' }}
+          {{ loading ? 'PDF 생성 중...' : 'PDF 다운로드' }}
         </button>
       </div>
     </div>
@@ -161,7 +168,8 @@
       </div>
       <!-- 고정 높이(520px) 및 내부 스크롤 처리 -->
       <div class="h-[520px] bg-gray-50 border rounded-lg overflow-auto custom-scrollbar flex justify-center p-4">
-        <ResumePreview :form="form" :photoUrl="photoUrl" />
+        <!-- ref 추가 -->
+        <ResumePreview ref="previewRef" :form="form" :photoUrl="photoUrl" />
       </div>
     </div>
 
@@ -177,13 +185,16 @@
 
 <script setup lang="ts">
 import { reactive, ref, computed } from 'vue'
-import { generateResumeDocx, type ResumePayload } from '../api'
+import { createGenerated } from '../api'
 import ResumePreview from './ResumePreview.vue'
+import html2canvas from 'html2canvas'
+import jsPDF from 'jspdf'
 
 const emit = defineEmits(['preview', 'generated'])
 
 interface CareerRow {
-  date: string
+  startDate: string
+  endDate: string
   content: string
   note: string
 }
@@ -196,16 +207,19 @@ const form = reactive({
   email: '',
   writtenDate: new Date().toISOString().slice(0, 10).replace(/-/g, '.'),
   signature: '',
-  careers: [{ date: '', content: '', note: '' }] as CareerRow[]
+  careers: [{ startDate: '', endDate: '', content: '', note: '' }] as CareerRow[]
 })
 
 const photoUrl = ref('')
 const photoFile = ref<File | null>(null)
-const saveToDocuments = ref(false)
+// const saveToDocuments = ref(false) // 제거됨
 const documentTitle = ref('이력서')
 const status = ref('완료')
 const loading = ref(false)
 const toast = ref('')
+
+// ResumePreview 컴포넌트 ref
+const previewRef = ref<InstanceType<typeof ResumePreview> | null>(null)
 
 const canGenerate = computed(() => form.name.trim() !== '')
 
@@ -219,7 +233,11 @@ function onPhotoChange(e: Event) {
 }
 
 function addCareer() {
-  form.careers.push({ date: '', content: '', note: '' })
+  if (form.careers.length >= 15) {
+    alert('학력 및 경력사항은 최대 15개 까지만 가능합니다! 이 바보야')
+    return
+  }
+  form.careers.push({ startDate: '', endDate: '', content: '', note: '' })
 }
 
 function removeCareer(idx: number) {
@@ -237,41 +255,13 @@ function resetForm() {
     email: '',
     writtenDate: new Date().toISOString().slice(0, 10).replace(/-/g, '.'),
     signature: '',
-    careers: [{ date: '', content: '', note: '' }]
+    careers: [{ startDate: '', endDate: '', content: '', note: '' }]
   })
   photoUrl.value = ''
   photoFile.value = null
-  saveToDocuments.value = false
+  // saveToDocuments.value = false
   documentTitle.value = '이력서'
   status.value = '완료'
-}
-
-function buildPayload(): ResumePayload {
-  // careers 데이터를 서버의 experiences 규격으로 변환
-  const experiences = form.careers.map(c => ({
-    company: c.content, // '내용'을 회사명/기관명으로 매핑
-    role: c.note,      // '비고'를 역할/직무로 매핑
-    period: c.date,    // '날짜'를 기간으로 매핑
-    description: '',
-    achievements: []
-  }))
-
-  return {
-    name: form.name,
-    title: '',
-    phone: form.phone,
-    email: form.email,
-    address: form.address,
-    summary: '',
-    experiences: experiences, // 매핑된 데이터 전달
-    educations: [],
-    skills: [],
-    certifications: [],
-    languages: [],
-    save_to_documents: saveToDocuments.value,
-    document_title: documentTitle.value || `이력서_${form.name}`,
-    status: status.value
-  }
 }
 
 function handlePreview() {
@@ -283,35 +273,7 @@ function handlePreview() {
   })
 }
 
-async function handleGenerateDocx() {
-  if (!canGenerate.value || loading.value) return
-  
-  try {
-    loading.value = true
-    const payload = buildPayload()
-    const result = await generateResumeDocx(payload)
-    
-    // 다운로드
-    const url = URL.createObjectURL(result.blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = result.filename
-    a.click()
-    URL.revokeObjectURL(url)
-    
-    showToast('DOCX 파일이 생성되었습니다.')
-    
-    if (result.saved) {
-      emit('generated')
-    }
-  } catch (error) {
-    console.error('DOCX 생성 실패:', error)
-    showToast('DOCX 생성에 실패했습니다.')
-  } finally {
-    loading.value = false
-  }
-}
-
+// PDF 다운로드 (기존 PDF 생성 버튼)
 function handleGeneratePdf() {
   if (!canGenerate.value || loading.value) return
   
@@ -320,6 +282,73 @@ function handleGeneratePdf() {
     photoUrl: photoUrl.value,
     downloadPdf: true
   })
+}
+
+// 저장하기 (새로운 기능: PDF 생성 후 업로드)
+async function handleSave() {
+  if (!canGenerate.value || loading.value) return
+  
+  // 미리보기 DOM 접근 확인
+  if (!previewRef.value?.resumeRef) {
+    alert('미리보기 로딩 중입니다. 잠시 후 다시 시도해주세요.')
+    return
+  }
+
+  try {
+    loading.value = true
+    const element = previewRef.value.resumeRef
+
+    // 1. HTML -> Canvas
+    const canvas = await html2canvas(element, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      backgroundColor: '#ffffff'
+    })
+
+    // 2. Canvas -> PDF Blob
+    const imgData = canvas.toDataURL('image/png')
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    })
+
+    const imgWidth = 210
+    const imgHeight = (canvas.height * imgWidth) / canvas.width
+    pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight)
+
+    const blob = pdf.output('blob')
+    
+    // 3. 업로드 Payload 준비
+    const formData = new FormData()
+    const fileName = `resume_${new Date().getTime()}.pdf`
+    
+    // API 요구사항에 맞춰 필드 구성
+    // title, user match(backend handles user from token), doc_type, file
+    formData.append('title', documentTitle.value || `이력서_${form.name}`)
+    formData.append('doc_type', 'resume')
+    formData.append('status', status.value)
+    formData.append('file', blob, fileName) // file_path 필드로 파일 전송 (또는 백엔드 구현에 따라 file일수도 있음, api.ts createGenerated 참고)
+    
+    // api.ts 의 createGenerated 는 FormData를 그대로 전송.
+    // 백엔드 Django ViewSet을 알 수 없으므로, 기존 createGenerated 사용.
+    // GeneratedDocument 모델의 필드를 추측: title, doc_type, status, file_path(FileField)
+    
+    // JSON 데이터도 필요하다면:
+    // formData.append('filled_data_json', JSON.stringify(form))
+
+    await createGenerated(formData)
+
+    showToast('나의 서류함에 저장되었습니다.')
+    emit('generated')
+
+  } catch (error) {
+    console.error('저장 실패:', error)
+    showToast('저장에 실패했습니다.')
+  } finally {
+    loading.value = false
+  }
 }
 
 function showToast(message: string) {

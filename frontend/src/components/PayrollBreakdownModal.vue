@@ -2,7 +2,7 @@
   <div v-if="visible" class="fixed inset-0 z-[60] flex items-center justify-center px-4 py-6">
     <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" @click="close"></div>
     <div
-      class="relative z-10 w-full max-w-3xl bg-white rounded-2xl shadow-2xl p-6 overflow-y-auto max-h-[90vh]"
+      class="relative z-10 w-full max-w-3xl bg-white rounded-2xl shadow-2xl p-6 pb-12 overflow-y-auto max-h-[85vh]"
       @click.stop
     >
       <!-- Header -->
@@ -23,12 +23,17 @@
       <div v-if="payroll" class="space-y-8">
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div class="p-4 rounded-xl bg-brand-50 border border-brand-100 flex flex-col justify-between">
-            <p class="text-[10px] font-bold text-brand-600 uppercase">최종 예상 급여</p>
-            <p class="text-xl font-black text-brand-900 mt-1">{{ formatCurrency(payroll.summary.total) }}</p>
+            <p class="text-[10px] font-bold text-brand-600 uppercase">최종 예상 급여 (실수령)</p>
+            <p class="text-xl font-black text-brand-900 mt-1">{{ formatCurrency(payroll.net_pay || payroll.summary.total) }}</p>
           </div>
           <div class="p-4 rounded-xl bg-gray-50 border border-gray-200 flex flex-col justify-between">
             <p class="text-[10px] font-bold text-gray-500 uppercase">기본급</p>
             <p class="text-lg font-bold text-gray-800 mt-1">{{ formatCurrency(payroll.summary.base_pay) }}</p>
+          </div>
+          <!-- 주휴수당 카드 추가 -->
+          <div class="p-4 rounded-xl bg-orange-50 border border-orange-100 flex flex-col justify-between">
+            <p class="text-[10px] font-bold text-orange-600 uppercase">주휴수당 (예상)</p>
+            <p class="text-lg font-bold text-orange-800 mt-1">{{ formatCurrency(payroll.summary.weekly_holiday_pay) }}</p>
           </div>
           <div class="p-4 rounded-xl bg-indigo-50 border border-indigo-100 flex flex-col justify-between">
             <p class="text-[10px] font-bold text-indigo-600 uppercase">야간 수당</p>
@@ -39,6 +44,48 @@
             <p class="text-lg font-bold text-red-800 mt-1">{{ formatCurrency(payroll.summary.holiday_extra) }}</p>
           </div>
         </div>
+
+
+
+        <!-- 공제 내역 섹션 (신규) -->
+        <section v-if="payroll.summary.deduction && payroll.summary.deduction.type !== 'NONE'">
+          <div class="flex items-center justify-between mb-4">
+             <h4 class="text-lg font-bold text-gray-900">공제 내역 (예상)</h4>
+             <span class="text-xs font-bold px-2 py-1 bg-gray-100 text-gray-600 rounded">
+               {{ payroll.summary.deduction.type === 'FOUR_INSURANCE' ? '4대보험 적용' : '3.3% 프리랜서 적용' }}
+             </span>
+          </div>
+          <div class="bg-gray-50 rounded-xl p-6 border border-gray-200">
+             <div v-for="(item, idx) in payroll.summary.deduction.details" :key="idx" class="flex justify-between items-center mb-2 text-sm text-gray-600">
+                <span>{{ item.label }}</span>
+                <span>- {{ formatCurrency(item.amount) }}</span>
+             </div>
+             <div class="border-t border-gray-200 my-4 border-dashed"></div>
+             <div class="flex justify-between items-center mb-2">
+                <span class="font-bold text-gray-700">총 공제액</span>
+                <span class="font-bold text-gray-700">- {{ formatCurrency(payroll.summary.deduction.total_deduction) }}</span>
+             </div>
+             <div class="bg-white rounded-lg p-4 mt-4 border border-brand-100 flex justify-between items-center shadow-sm">
+                <div>
+                   <span class="block text-xs font-bold text-brand-600 mb-1">세전 {{ formatCurrency(payroll.summary.total) }} - 공제 {{ formatCurrency(payroll.summary.deduction.total_deduction) }}</span>
+                   <span class="text-lg font-black text-brand-900">실수령 예상액</span>
+                </div>
+                <span class="text-2xl font-black text-brand-600">{{ formatCurrency(payroll.summary.deduction.net_pay) }}</span>
+             </div>
+          </div>
+        </section>
+
+        <!-- 공제 미선택 안내 -->
+        <section v-else class="p-4 bg-orange-50 border border-orange-100 rounded-lg flex items-start gap-3">
+           <div class="text-xl">⚠️</div>
+           <div>
+              <p class="font-bold text-orange-900 text-sm mb-1">공제 방식이 선택되지 않았습니다</p>
+              <p class="text-xs text-orange-700 leading-relaxed">
+                 현재 표시된 급여는 세전 기준입니다. <br/>
+                 실제 수령액을 확인하려면 근로정보 수정에서 공제 방식을 선택해주세요.
+              </p>
+           </div>
+        </section>
 
         <!-- 2. Detailed Breakdown Table -->
         <section>
@@ -142,12 +189,21 @@ interface PayrollSummaryResponse {
   holiday_bonus: number;
   night_hours: number;
   night_bonus: number;
+
   estimated_monthly_pay: number;
+  net_pay: number;
   summary: {
     base_pay: number;
     night_extra: number;
     holiday_extra: number;
+    weekly_holiday_pay?: number; // 주휴수당 추가
     total: number;
+    deduction?: {
+      type: string;
+      total_deduction: number;
+      net_pay: number;
+      details: Array<{ label: string; amount: number }>;
+    };
   };
   rows: PayrollBreakdownItem[];
   notes: string[];

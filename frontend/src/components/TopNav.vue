@@ -1,13 +1,24 @@
 <template>
   <nav class="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
     <div class="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex items-center justify-between h-16 gap-4">
+      <div class="flex items-center justify-between h-20 gap-4">
+
+
+
+
+
         
         <!-- LEFT: Logo -->
         <div class="flex-shrink-0">
           <router-link to="/" class="flex items-center gap-2 hover:opacity-80 active:opacity-70 transition-opacity">
-            <img src="@/assets/logo.svg" alt="NOTAV" class="h-8 w-8 sm:h-9 sm:w-9" />
-            <span class="hidden sm:inline font-bold text-gray-900 text-base sm:text-lg">Notav</span>
+            <img src="@/assets/logo.png" alt="NOTAV" class="h-10 w-auto sm:h-12" />
+
+
+
+
+
+
+
           </router-link>
         </div>
 
@@ -31,13 +42,16 @@
 
           <!-- User Profile Dropdown (when logged in) -->
           <div v-if="isLoggedIn" class="flex items-center gap-3 pl-3 border-l border-gray-200 relative">
-            <div class="flex items-center gap-3 cursor-pointer group">
-              <div class="w-8 h-8 rounded-full bg-brand-500 flex items-center justify-center text-white text-sm font-bold flex-shrink-0 group-hover:bg-brand-600 transition-colors duration-200">
-                {{ userInitial }}
+            <div 
+              @click="isProfileDropdownOpen = !isProfileDropdownOpen"
+              class="flex items-center gap-3 cursor-pointer group"
+            >
+              <div class="w-8 h-8 rounded-full overflow-hidden bg-brand-500 flex items-center justify-center text-white text-sm font-bold flex-shrink-0 group-hover:bg-brand-600 transition-colors duration-200">
+                <img v-if="userAvatar" :src="userAvatar" class="w-full h-full object-cover" alt="Profile" />
+                <span v-else>{{ userInitial }}</span>
               </div>
-              <span class="hidden sm:inline text-sm font-medium text-gray-900 group-hover:text-brand-600 transition-colors duration-200">{{ userName }}</span>
+              <span class="hidden sm:inline text-sm font-medium text-gray-900 group-hover:text-brand-600 transition-colors duration-200 select-none">{{ userName }}</span>
               <button 
-                @click="isProfileDropdownOpen = !isProfileDropdownOpen"
                 class="text-gray-600 hover:text-brand-600 transition-colors duration-200"
                 :class="{ 'rotate-180': isProfileDropdownOpen }">
                 <svg class="w-5 h-5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -48,17 +62,6 @@
 
             <!-- Profile Dropdown Menu -->
             <div v-if="isProfileDropdownOpen" class="absolute top-full right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-100 py-2 z-10 animate-in fade-in slide-in-from-top-2 duration-150">
-              <button 
-                @click="navigateTo('/profile')"
-                class="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-brand-50 hover:text-brand-600 transition-colors duration-150">
-                프로필 보기
-              </button>
-              <button 
-                @click="navigateTo('/settings')"
-                class="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-brand-50 hover:text-brand-600 transition-colors duration-150">
-                설정
-              </button>
-              <hr class="my-2 border-gray-100" />
               <button 
                 @click="handleLogout"
                 class="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors duration-150">
@@ -86,6 +89,7 @@ const isProfileDropdownOpen = ref(false);
 
 const userName = computed(() => user.nickname || user.username || '사용자');
 const userInitial = computed(() => (user.nickname || user.username || '사용자').charAt(0));
+const userAvatar = computed(() => user.avatar);
 
 function navigateTo(path: string) {
   isProfileDropdownOpen.value = false;

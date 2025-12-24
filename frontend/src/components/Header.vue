@@ -1,15 +1,15 @@
 <template>
   <header class="fixed top-0 inset-x-0 bg-white/80 backdrop-blur border-b z-40">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
-      <div class="flex items-center gap-2">
-        <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-brand-600 text-white font-bold">
-          N
-        </span>
-        <div class="flex flex-col leading-tight">
-          <span class="font-semibold text-gray-900">Notav</span>
-          <span class="text-xs text-gray-500">근로환경 통합 관리 플랫폼</span>
-        </div>
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-20">
+
+
+
+
+
+      <div class="flex items-center gap-3">
+        <img src="@/assets/logo.png" alt="Notav" class="h-10 w-auto" />
       </div>
+
 
       <nav class="hidden md:flex items-center gap-6 text-sm">
         <button class="text-gray-600 hover:text-gray-900" @click="$emit('navigate', 'landing')">

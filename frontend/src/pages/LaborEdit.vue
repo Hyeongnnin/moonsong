@@ -64,6 +64,25 @@
           </div>
         </div>
 
+
+        <!-- 공제 방식 선택 -->
+        <div class="mb-6">
+          <label for="deduction_type" class="block text-sm font-semibold text-gray-900 mb-2">
+            공제 방식 선택
+          </label>
+          <select
+            id="deduction_type"
+            v-model="formData.deduction_type"
+            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent transition">
+            <option value="NONE">잘 모르겠어요 (기본)</option>
+            <option value="FOUR_INSURANCE">4대보험 적용</option>
+            <option value="FREELANCE">3.3% 공제 (프리랜서/삼쩜삼)</option>
+          </select>
+          <p class="mt-1 text-xs text-gray-500">
+            실수령액 계산을 위해 필요한 정보입니다. 정확히 모르면 '잘 모르겠어요'를 선택하세요.
+          </p>
+        </div>
+
         <!-- 근로 시작일 -->
         <div class="mb-6">
           <label for="start_date" class="block text-sm font-semibold text-gray-900 mb-2">
@@ -91,10 +110,10 @@
             </label>
             <button 
               type="button"
-              @click="autoFillContractHours"
+              @click="toggleManualInput"
               class="text-xs font-medium text-brand-600 hover:text-brand-700 bg-brand-50 px-2 py-1 rounded border border-brand-200 transition-colors"
             >
-              주간 스케줄에서 자동 입력
+              {{ isManualInput ? '주간 스케줄로 자동 계산' : '직접 근로시간 입력' }}
             </button>
           </div>
           <div class="relative">
@@ -105,12 +124,21 @@
               min="0"
               max="60"
               step="0.5"
-              class="w-full px-4 pr-12 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent transition"
+              :readonly="!isManualInput"
+              :class="[
+                'w-full px-4 pr-12 py-2 border rounded-lg transition',
+                isManualInput 
+                  ? 'border-gray-300 focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white' 
+                  : 'border-gray-200 bg-gray-50 cursor-not-allowed text-gray-600'
+              ]"
               placeholder="예: 20, 40">
             <span class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500">시간</span>
           </div>
           <p class="mt-1 text-xs text-gray-500">
-            근로계약서에 적긴 1주 소정근로시간입니다. 주휴/연장 판단 기준으로 사용됩니다.
+            {{ isManualInput 
+              ? '직접 입력 모드입니다. 근로계약서에 적힌 주 소정근로시간을 입력하세요.' 
+              : '주간 스케줄을 기준으로 자동 계산됩니다. 직접 입력하려면 위 버튼을 클릭하세요.'
+            }}
           </p>
         </div>
 
@@ -161,6 +189,7 @@ const formData = reactive({
   start_date: '',
   hourly_rate: 0,
   contract_weekly_hours: null as number | null,
+  deduction_type: 'NONE',
   // 평가 추가 필드
   attendance_rate_last_year: null as number | null,
   total_wage_last_3m: null as number | null,
@@ -175,6 +204,19 @@ const submitError = ref<string | null>(null)
 
 // WeeklyScheduleEditor 컴포넌트 참조
 const weeklyScheduleEditorRef = ref<InstanceType<typeof WeeklyScheduleEditor> | null>(null)
+
+// 수동 입력 모드 상태
+const isManualInput = ref(false)
+
+// 수동 입력 모드 토글
+function toggleManualInput() {
+  isManualInput.value = !isManualInput.value
+  
+  // 자동 계산 모드로 전환 시 즉시 스케줄 기반으로 계산
+  if (!isManualInput.value) {
+    autoFillContractHours(true) // silent mode
+  }
+}
 
 /**
  * 폼 로드: activeJob의 현재 데이터를 폼에 채우기
@@ -193,6 +235,7 @@ async function loadFormData() {
       formData.start_date = data.start_date || ''
       formData.hourly_rate = parseFloat(data.hourly_rate) || 0
       formData.contract_weekly_hours = data.contract_weekly_hours ?? null
+      formData.deduction_type = data.deduction_type || 'NONE'
       formData.attendance_rate_last_year = data.attendance_rate_last_year ?? null
       formData.total_wage_last_3m = data.total_wage_last_3m ?? null
       formData.total_days_last_3m = data.total_days_last_3m ?? null
@@ -252,6 +295,11 @@ async function submitForm() {
     return
   }
 
+  // 제출 직전 자동 계산 모드라면 스케줄 기반 시간 최신화
+  if (!isManualInput.value) {
+    autoFillContractHours(true)
+  }
+
   const scheduleSnapshot = weeklyScheduleEditorRef.value?.exportSchedules?.()
   submitError.value = null
   isSubmitting.value = true
@@ -265,6 +313,7 @@ async function submitForm() {
       is_workplace_over_5: formData.is_workplace_over_5,
       hourly_rate: formData.hourly_rate,
       contract_weekly_hours: formData.contract_weekly_hours,
+      deduction_type: formData.deduction_type,
       attendance_rate_last_year: formData.attendance_rate_last_year,
       total_wage_last_3m: formData.total_wage_last_3m,
       total_days_last_3m: formData.total_days_last_3m,
@@ -351,16 +400,16 @@ async function submitForm() {
 /**
  * 주간 스케줄 합계를 계산하여 계약상 시간에 자동 입력
  */
-function autoFillContractHours() {
+function autoFillContractHours(silent = false) {
   const scheduleSnapshot = weeklyScheduleEditorRef.value?.exportSchedules?.()
   if (!scheduleSnapshot) {
-    alert('설정된 주간 스케줄이 없습니다.')
+    if (!silent) alert('설정된 주간 스케줄이 없습니다.')
     return
   }
 
   const schedules = Object.values(scheduleSnapshot)
   if (schedules.length === 0) {
-    alert('설정된 주간 스케줄이 없습니다.')
+    if (!silent) alert('설정된 주간 스케줄이 없습니다.')
     return
   }
 
@@ -390,7 +439,7 @@ function autoFillContractHours() {
   formData.contract_weekly_hours = parseFloat((totalMinutes / 60).toFixed(1))
   const totalHours = totalMinutes / 60
   
-  if (totalHours > 40) {
+  if (totalHours > 40 && !silent) {
     // 40시간 초과 시 경고 (법적 소정근로시간 한도는 40시간이지만 계약상 입력은 가능하게 유지)
     console.warn('법적 소정근로시간은 주 40시간입니다. 계약서 기준이면 괜찮습니다.')
   }
@@ -404,8 +453,25 @@ function cancelEdit() {
 }
 
 // 컴포넌트 마운트 시 폼 데이터 로드
-onMounted(() => {
-  loadFormData()
+onMounted(async () => {
+  await loadFormData()
+  
+  // 폼 로드 후 스케줄 기반으로 자동 계산 (약간의 딜레이를 줘서 WeeklyScheduleEditor가 준비되도록 함)
+  setTimeout(() => {
+    if (!isManualInput.value) {
+      autoFillContractHours(true) // silent mode
+    }
+  }, 500)
+  
+  // 주기적으로 스케줄 변경사항 확인하여 자동 계산 (자동 모드일 때만)
+  const intervalId = setInterval(() => {
+    if (!isManualInput.value && weeklyScheduleEditorRef.value) {
+      autoFillContractHours(true) // silent mode
+    }
+  }, 2000) // 2초마다 확인
+  
+  // 컴포넌트 언마운트 시 인터벌 정리
+  return () => clearInterval(intervalId)
 })
 
 // Watch for changes in selected job and reload form accordingly

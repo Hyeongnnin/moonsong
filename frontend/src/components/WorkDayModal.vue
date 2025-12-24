@@ -13,7 +13,7 @@
           class="flex items-center gap-2 text-sm font-semibold text-orange-700 bg-orange-50 border border-orange-200 rounded px-3 py-2"
         >
           <span>📋 소정근로일</span>
-          <span class="text-xs text-orange-600">이 날짜는 근무 예정일입니다</span>
+
         </div>
         <div
           v-else-if="!isScheduledWorkday && hasAnyTime"

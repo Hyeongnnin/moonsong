@@ -5,24 +5,31 @@
     <!-- Entire content area -->
     <main class="flex-1 min-h-0 w-full flex flex-col overflow-hidden">
       <!-- Centered container -->
-      <div class="flex-1 min-h-0 w-full max-w-[1320px] mx-auto px-4 py-4">
-        <!-- Grid: main (left) + sidebar (right) -->
-        <div class="grid h-full items-stretch" style="grid-template-columns: 2fr 360px; gap: 40px;">
+      <div class="flex-1 min-h-0 w-full max-w-[1600px] mx-auto px-4 py-4">
+        <!-- Grid: left sidebar + main + right sidebar -->
+        <div class="grid h-full items-stretch" style="grid-template-columns: 180px 1fr 360px; gap: 20px;">
+
+          <!-- Left Sidebar - Section Navigation -->
+          <aside class="flex flex-col gap-2 h-full overflow-y-auto pr-1 custom-scrollbar">
+            <button
+              v-for="(section, index) in sections"
+              :key="section.id"
+              @click="activeSection = index"
+              class="px-4 py-3 text-sm font-medium text-left rounded-lg transition-all duration-200 whitespace-nowrap"
+              :class="activeSection === index
+                ? 'bg-brand-600 text-white shadow-md'
+                : 'text-gray-700 hover:bg-brand-50 hover:text-brand-600'">
+              {{ section.label }}
+            </button>
+          </aside>
 
           <!-- Main column -->
           <div class="flex flex-col h-full min-h-0 overflow-hidden">
-            <!-- Section Tabs -->
-            <div class="flex gap-2 mb-4 border-b border-gray-200 pb-2 overflow-x-auto shrink-0">
-              <button
-                v-for="(section, index) in sections"
-                :key="section.id"
-                @click="activeSection = index"
-                class="px-4 py-2 text-sm font-medium whitespace-nowrap rounded-t-lg transition-all duration-200"
-                :class="activeSection === index
-                  ? 'text-brand-600 bg-white border-b-2 border-brand-600 -mb-[2px]'
-                  : 'text-gray-600 hover:text-brand-600 hover:bg-gray-100/50'">
-                {{ section.label }}
-              </button>
+            <!-- Welcome Message -->
+            <div class="mb-4 px-4 py-3 bg-gradient-to-r from-brand-50 to-blue-50 rounded-lg border border-brand-100">
+              <h2 class="text-lg font-semibold text-gray-800">
+                <span class="text-brand-600">{{ userName }}</span>님 환영합니다!
+              </h2>
             </div>
 
             <!-- Content Container (The Unified White Card) -->
@@ -93,11 +100,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, defineAsyncComponent, onMounted, watch, onUnmounted } from 'vue'
+import { ref, defineAsyncComponent, onMounted, watch, onUnmounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import TopNav from './TopNav.vue'
 import RightSidebar from './RightSidebar.vue'
 import { useJob } from '../stores/jobStore'
+import { useUser } from '../stores/userStore'
 import ErrorBoundary from './ErrorBoundary.vue'
 
 // Import section components
@@ -120,7 +128,12 @@ const sections = [
 const activeSection = ref(0)
 
 const { initialize: initializeJobs } = useJob()
+const { user } = useUser()
 const route = useRoute()
+
+// Computed property for user name
+const userName = computed(() => user.nickname || user.username || '사용자')
+
 
 // 컴포넌트 마운트 시 Job 데이터 초기화 및 URL 쿼리 파라미터 확인
 function handleGoSection(ev: CustomEvent<string>) {
@@ -206,8 +219,12 @@ section {
 /* Responsive: 작은 화면에서는 한 열로 쌓음 */
 @media (max-width: 1024px) {
   .mx-auto.w-full.max-w-\[1320px\].px-4 { padding-left: 16px; padding-right: 16px; }
-  /* Grid 내부에서 aside 숨김 및 main full width */
-  .mx-auto > .grid { display: block; }
-  .mx-auto > .grid > aside { display: none !important; }
+  /* Grid 내부에서 sidebars 숨김 및 main full width */
+  .mx-auto > .grid { 
+    display: block; 
+  }
+  .mx-auto > .grid > aside { 
+    display: none !important; 
+  }
 }
 </style>

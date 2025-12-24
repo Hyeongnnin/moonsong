@@ -1,7 +1,9 @@
 # accounts/serializers.py
 from rest_framework import serializers
 from .models import User
+from django.contrib.auth.validators import UnicodeUsernameValidator
 from django.contrib.auth.password_validation import validate_password
+from rest_framework.validators import UniqueValidator
 from django.conf import settings
 
 
@@ -22,6 +24,16 @@ class UserSerializer(serializers.ModelSerializer):
         return None
 
 class SignupSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(
+        max_length=150,
+        validators=[
+            UnicodeUsernameValidator(),
+            UniqueValidator(
+                queryset=User.objects.all(),
+                message='이미 사용 중인 아이디입니다.'
+            )
+        ]
+    )
     password = serializers.CharField(write_only=True, validators=[validate_password])
 
     class Meta:

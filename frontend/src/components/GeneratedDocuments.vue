@@ -7,9 +7,7 @@
         <h2 class="text-2xl font-semibold text-gray-900">나의 서류함</h2>
       </div>
       <div class="flex flex-wrap gap-2">
-        <button @click="reload" class="px-3 py-2 text-sm rounded border border-gray-200 hover:bg-gray-50 flex items-center gap-2">
-          <span>새로고침</span>
-        </button>
+
         <button @click="showCreate = !showCreate" class="px-3 py-2 text-sm rounded bg-brand-600 text-white hover:bg-brand-700">
           {{ showCreate ? '업로드 닫기' : '새 서류 업로드' }}
         </button>
@@ -23,16 +21,9 @@
 
     <!-- Filters -->
     <div class="grid gap-3 md:grid-cols-4 bg-white border border-gray-200 rounded-lg p-4">
-      <div class="md:col-span-2">
+      <div class="md:col-span-3">
         <label class="text-xs text-gray-500">검색</label>
-        <input v-model="search" type="text" placeholder="제목, 템플릿명, 상태 검색" class="w-full mt-1 px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-brand-200" />
-      </div>
-      <div>
-        <label class="text-xs text-gray-500">문서 유형</label>
-        <select v-model="typeFilter" class="w-full mt-1 px-3 py-2 border rounded bg-white">
-          <option value="all">전체</option>
-          <option v-for="t in docTypes" :key="t" :value="t">{{ t }}</option>
-        </select>
+        <input v-model="search" type="text" placeholder="제목, 상태 검색" class="w-full mt-1 px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-brand-200" />
       </div>
       <div class="grid grid-cols-2 gap-2">
         <div>
@@ -49,7 +40,6 @@
           <select v-model="sortKey" class="w-full mt-1 px-3 py-2 border rounded bg-white">
             <option value="newest">최신순</option>
             <option value="oldest">오래된순</option>
-            <option value="name">템플릿명</option>
           </select>
         </div>
       </div>
@@ -70,7 +60,6 @@
           <div>
             <p class="text-xs text-gray-500">제목</p>
             <h3 class="text-lg font-semibold text-gray-900">{{ d.title || '제목 미입력' }}</h3>
-            <p class="text-xs text-gray-500 mt-1">템플릿: {{ getTemplateName(d) }} · {{ getDocType(d) }}</p>
           </div>
           <span class="px-2 py-1 text-xs rounded-full" :class="statusBadgeClass(d.status)">{{ d.status || '작성중' }}</span>
         </div>
@@ -88,9 +77,8 @@
         </div>
 
         <div class="flex flex-wrap gap-2 mt-auto">
-          <button v-if="d.file_url" @click.prevent="openPreview(d)" class="px-3 py-2 text-sm bg-brand-600 text-white rounded hover:bg-brand-700">미리보기</button>
+          <button @click.prevent="openPreview(d)" class="px-3 py-2 text-sm bg-brand-600 text-white rounded hover:bg-brand-700">미리보기</button>
           <button v-if="d.file_url" @click.prevent="openDownload(d.file_url)" class="flex-1 px-3 py-2 text-sm border rounded hover:bg-gray-50">다운로드</button>
-          <button @click="onEdit(d)" class="px-3 py-2 text-sm border rounded hover:bg-gray-50">수정</button>
           <button @click="onDelete(d)" class="px-3 py-2 text-sm border border-red-200 text-red-700 rounded hover:bg-red-50">삭제</button>
         </div>
       </article>
@@ -117,18 +105,7 @@
           </div>
         </div>
 
-        <div class="grid gap-3 md:grid-cols-2">
-          <div>
-            <label class="block text-sm font-medium mb-1">템플릿 (선택)</label>
-            <select v-model="editForm.template" class="w-full px-3 py-2 border rounded bg-white">
-              <option value="">변경 없음 / 해제</option>
-              <option v-for="t in templates" :key="t.id" :value="String(t.id)">{{ t.name }} ({{ t.doc_type }})</option>
-            </select>
-          </div>
-          <div class="text-xs text-gray-500 self-end">
-            템플릿을 해제하면 사용자 지정 문서로 남습니다. 필요 시 다시 선택하세요.
-          </div>
-        </div>
+
 
         <div>
           <label class="block text-sm font-medium mb-1">파일 교체 (선택, PDF)</label>
@@ -157,7 +134,6 @@
         <div class="flex items-center justify-between p-4 border-b">
           <div>
             <h3 class="text-lg font-semibold">{{ previewDoc?.title || '서류 미리보기' }}</h3>
-            <p class="text-xs text-gray-500">{{ getTemplateName(previewDoc!) }} · {{ getDocType(previewDoc!) }}</p>
           </div>
           <button @click="closePreviewModal" class="text-gray-500 hover:text-gray-700">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -169,10 +145,19 @@
         <!-- 스크롤 가능한 뷰어 컨테이너 (100% 격리) -->
         <div class="flex-1 overflow-auto bg-gray-100">
           <div class="p-6">
+            <!-- Loading Spinner -->
+            <div v-if="previewLoading" class="min-h-[297mm] flex flex-col items-center justify-center bg-gray-50 border border-gray-200">
+              <svg class="animate-spin h-10 w-10 text-brand-600 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <p class="text-gray-500 font-medium">문서를 불러오는 중입니다...</p>
+            </div>
+
             <!-- PDF 파일이 있는 경우 iframe으로 표시 -->
-            <div v-if="previewDoc?.file_url" class="viewer-container">
+            <div v-else-if="previewPdfUrl" class="viewer-container">
               <iframe 
-                :src="resolveFileUrl(previewDoc.file_url)" 
+                :src="previewPdfUrl" 
                 class="preview-iframe"
                 frameborder="0"
               />
@@ -182,7 +167,6 @@
               <div class="preview-content">
                 <div class="text-center mb-6">
                   <h1 class="text-3xl font-bold">{{ previewDoc?.title || '제목 없음' }}</h1>
-                  <p class="text-sm text-gray-600 mt-2">{{ getTemplateName(previewDoc!) }}</p>
                 </div>
                 
                 <div class="space-y-4 text-sm">
@@ -190,7 +174,6 @@
                     <p class="font-medium mb-2">⚠️ 파일이 첨부되지 않았습니다</p>
                     <p class="text-gray-700">
                       이 서류에는 아직 파일이 업로드되지 않았습니다. 
-                      수정 버튼을 눌러 PDF 파일을 업로드해주세요.
                     </p>
                   </div>
 
@@ -198,8 +181,6 @@
                     <p class="font-medium mb-2">서류 정보</p>
                     <ul class="list-disc list-inside space-y-1 text-gray-700">
                       <li>제목: {{ previewDoc?.title || '제목 없음' }}</li>
-                      <li>템플릿: {{ getTemplateName(previewDoc!) }}</li>
-                      <li>문서 유형: {{ getDocType(previewDoc!) }}</li>
                       <li>상태: {{ previewDoc?.status || '작성중' }}</li>
                       <li>생성일: {{ formatDate(previewDoc?.created_at) }}</li>
                     </ul>
@@ -237,17 +218,17 @@
 </template>
 
 <script setup lang="ts">
+import axios from 'axios'
 import { computed, onMounted, ref } from 'vue'
-import { fetchGenerated, fetchTemplates, type GeneratedDocument, deleteGenerated, updateGenerated } from '../api'
+import { fetchGenerated, type GeneratedDocument, deleteGenerated, updateGenerated } from '../api'
 import CreateDocumentForm from './CreateDocumentForm.vue'
 
 const docs = ref<GeneratedDocument[]>([])
-const templates = ref<any[]>([])
 const loading = ref(true)
 const showCreate = ref(false)
 const showEdit = ref(false)
 const editingDoc = ref<GeneratedDocument | null>(null)
-const editForm = ref({ title: '', status: '작성중', template: '' })
+const editForm = ref({ title: '', status: '작성중' })
 const editFileRef = ref<File | null>(null)
 const editFileName = ref('')
 const toast = ref({ message: '', type: '' })
@@ -255,59 +236,40 @@ const toast = ref({ message: '', type: '' })
 // 미리보기 관련 상태
 const showPreviewModal = ref(false)
 const previewDoc = ref<GeneratedDocument | null>(null)
+const previewPdfUrl = ref<string>('')
+const previewLoading = ref(false)
 
 const search = ref('')
 const statusFilter = ref<'all' | string>('all')
-const typeFilter = ref<'all' | string>('all')
-const sortKey = ref<'newest' | 'oldest' | 'name'>('newest')
+const sortKey = ref<'newest' | 'oldest'>('newest')
 
 onMounted(async () => {
   await reload()
 })
 
-const docTypes = computed(() => {
-  const types = new Set<string>()
-  // ✅ B 프로젝트 병합: 템플릿 기반 + doc_type 필드 모두 포함
-  templates.value.forEach((t: any) => {
-    if (t.doc_type) types.add(t.doc_type)
-  })
-  docs.value.forEach((d) => {
-    if (d.doc_type) types.add(d.doc_type)
-  })
-  return Array.from(types)
-})
-
 const filteredDocs = computed(() => {
   const term = search.value.trim().toLowerCase()
-  const type = typeFilter.value
   const status = statusFilter.value
 
-  const enriched = docs.value.map((d) => {
-    const tpl = resolveTemplate(d)
-    // ✅ B 프로젝트 병합: doc_type 필드도 고려
-    const docType = d.doc_type || tpl?.doc_type || ''
-    return { ...d, _templateName: tpl?.name || '템플릿 없음', _docType: docType }
-  })
-
-  let result = enriched.filter((d) => {
+  let result = docs.value.filter((d) => {
     const matchesSearch = term
       ? (d.title || '').toLowerCase().includes(term)
-        || d._templateName.toLowerCase().includes(term)
-        || d._docType.toLowerCase().includes(term)
         || (d.status || '').toLowerCase().includes(term)
       : true
-    const matchesType = type === 'all' ? true : d._docType === type
     const matchesStatus = status === 'all' ? true : (d.status || '작성중') === status
-    return matchesSearch && matchesType && matchesStatus
+    return matchesSearch && matchesStatus
   })
 
   result = result.sort((a, b) => {
-    if (sortKey.value === 'name') {
-      return a._templateName.localeCompare(b._templateName)
+    if (sortKey.value === 'oldest') {
+      const aDate = a.created_at ? new Date(a.created_at).getTime() : 0
+      const bDate = b.created_at ? new Date(b.created_at).getTime() : 0
+      return aDate - bDate
     }
+    // Default newest
     const aDate = a.created_at ? new Date(a.created_at).getTime() : 0
     const bDate = b.created_at ? new Date(b.created_at).getTime() : 0
-    return sortKey.value === 'newest' ? bDate - aDate : aDate - bDate
+    return bDate - aDate
   })
 
   return result
@@ -316,9 +278,8 @@ const filteredDocs = computed(() => {
 async function reload() {
   loading.value = true
   try {
-    const [generated, tpl] = await Promise.all([fetchGenerated(), fetchTemplates()])
+    const generated = await fetchGenerated()
     docs.value = generated
-    templates.value = tpl
   } catch (e) {
     console.error('문서 로드 실패', e)
     showToast('문서를 불러오지 못했습니다. 로그인 상태를 확인하세요.', 'error')
@@ -327,25 +288,6 @@ async function reload() {
   }
 }
 
-function resolveTemplate(d: GeneratedDocument) {
-  if (!d.template) return null
-  if (typeof d.template === 'number') {
-    return templates.value.find((x: any) => x.id === d.template) || null
-  }
-  return d.template as any
-}
-
-function getTemplateName(d: GeneratedDocument) {
-  const tpl = resolveTemplate(d)
-  return tpl?.name || '템플릿 없음'
-}
-
-function getDocType(d: GeneratedDocument) {
-  // ✅ B 프로젝트 병합: doc_type 필드 우선, 없으면 템플릿에서 가져오기
-  if (d.doc_type) return d.doc_type
-  const tpl = resolveTemplate(d)
-  return tpl?.doc_type || '유형 미지정'
-}
 
 function resolveFileUrl(url: string | undefined | null) {
   if (!url) return '#'
@@ -377,7 +319,6 @@ function onEdit(d: GeneratedDocument) {
   editingDoc.value = d
   editForm.value.title = d.title || ''
   editForm.value.status = d.status || '작성중'
-  editForm.value.template = d.template ? String((d.template as any).id ?? d.template) : ''
   editFileRef.value = null
   editFileName.value = ''
   showEdit.value = true
@@ -412,7 +353,6 @@ async function saveEdit() {
   const fd = new FormData()
   fd.append('title', editForm.value.title)
   if (editForm.value.status) fd.append('status', editForm.value.status)
-  if (editForm.value.template !== '') fd.append('template', editForm.value.template)
   if (editFileRef.value) fd.append('file', editFileRef.value)
   try {
     const updated = await updateGenerated(editingDoc.value.id, fd)
@@ -454,14 +394,36 @@ function showToast(message: string, type = 'info') {
   }, 3000)
 }
 
-function openPreview(d: GeneratedDocument) {
+async function openPreview(d: GeneratedDocument) {
   previewDoc.value = d
   showPreviewModal.value = true
+  previewPdfUrl.value = ''
+  
+  if (d.file_url) {
+    try {
+      previewLoading.value = true
+      const url = resolveFileUrl(d.file_url)
+      // fetch as blob to bypass X-Frame-Options SAMEORIGIN issues with localhost port mismatch
+      const response = await axios.get(url, { responseType: 'blob' })
+      const blob = new Blob([response.data], { type: 'application/pdf' })
+      previewPdfUrl.value = URL.createObjectURL(blob)
+    } catch (e) {
+      console.error('Preview load failed', e)
+      // Fallback
+      previewPdfUrl.value = resolveFileUrl(d.file_url)
+    } finally {
+      previewLoading.value = false
+    }
+  }
 }
 
 function closePreviewModal() {
+  if (previewPdfUrl.value && previewPdfUrl.value.startsWith('blob:')) {
+    URL.revokeObjectURL(previewPdfUrl.value)
+  }
   showPreviewModal.value = false
   previewDoc.value = null
+  previewPdfUrl.value = ''
 }
 
 // 부모 컴포넌트에서 호출할 수 있도록 expose

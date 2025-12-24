@@ -1,13 +1,27 @@
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-gray-50 pt-16">
+  <div class="min-h-screen flex items-center justify-center bg-gray-50 pt-20">
+
+
+
+
     <div class="w-full max-w-lg px-4">
       <div class="bg-white shadow-lg rounded-2xl border border-gray-100 p-8 space-y-6">
-        <div>
-          <h2 class="text-2xl font-semibold text-gray-900 mb-2">회원가입</h2>
-          <p class="text-sm text-gray-500">
-            아래 기본 정보를 입력해주세요.
-          </p>
+        <div class="space-y-4">
+          <div class="flex justify-center mb-2">
+            <img src="@/assets/logo.png" alt="Notav" class="h-20 w-auto mb-2" />
+
+
+
+
+          </div>
+          <div>
+            <h2 class="text-2xl font-semibold text-gray-900 mb-2">회원가입</h2>
+            <p class="text-sm text-gray-500">
+              아래 기본 정보를 입력해주세요.
+            </p>
+          </div>
         </div>
+
 
         <form @submit.prevent="handleSignup" class="space-y-4">
           <div>

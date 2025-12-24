@@ -419,12 +419,15 @@
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex flex-col md:flex-row justify-between gap-8 mb-6">
           <div>
-            <div class="flex items-center gap-2 mb-3">
-              <span class="text-xl font-semibold text-white">노타브</span>
+            <div class="flex items-center gap-3 mb-3">
+              <img src="@/assets/logo.png" alt="노타브" class="h-16 w-auto brightness-0 invert" />
+
+              <span class="text-xl font-semibold text-white tracking-tight">노타브</span>
               <span class="text-xs px-2 py-1 rounded-full bg-brand-600 text-white">
                 Beta
               </span>
             </div>
+
             <p class="text-sm text-gray-500 max-w-md">
               청년·알바생·직장인의 안전한 노동 환경을 위해, 근로계약서 진단과 노동법률 상담을 쉽고 간편하게 제공합니다.
             </p>

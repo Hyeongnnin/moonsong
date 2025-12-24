@@ -23,10 +23,42 @@
       </div>
 
       <div v-else class="space-y-4">
+        <!-- 추가 수당 -->
+        <div class="flex items-center justify-between py-2">
+          <div class="flex flex-col">
+            <span class="text-xs text-brand-600 font-medium mb-0.5">추가 수당</span>
+            <span class="text-sm text-gray-900 font-semibold">적용되나요?</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span :class="diagnosis.extraPay.statusClass" class="text-sm font-bold">
+              {{ diagnosis.extraPay.statusText }}
+            </span>
+            <span class="text-lg">{{ diagnosis.extraPay.icon }}</span>
+          </div>
+        </div>
+
+        <div class="border-t border-gray-100"></div>
+
+        <!-- 지난 주 주휴수당 (New) -->
+        <div class="flex items-center justify-between py-2">
+          <div class="flex flex-col">
+            <span class="text-xs text-brand-600 font-medium mb-0.5">지난 주 주휴수당</span>
+            <span class="text-sm text-gray-900 font-semibold">받을 수 있나요?</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span :class="diagnosis.lastWeekHolidayPay.statusClass" class="text-sm font-bold">
+              {{ diagnosis.lastWeekHolidayPay.statusText }}
+            </span>
+            <span class="text-lg">{{ diagnosis.lastWeekHolidayPay.icon }}</span>
+          </div>
+        </div>
+        
+        <div class="border-t border-gray-100"></div>
+
         <!-- 주휴수당 요건 -->
         <div class="flex items-center justify-between py-2">
           <div class="flex flex-col">
-            <span class="text-xs text-brand-600 font-medium mb-0.5">주휴수당</span>
+            <span class="text-xs text-brand-600 font-medium mb-0.5">이번 주 주휴수당</span>
             <span class="text-sm text-gray-900 font-semibold">받을 수 있나요?</span>
           </div>
           <div class="flex items-center gap-2">
@@ -69,22 +101,6 @@
           </div>
         </div>
 
-        <div class="border-t border-gray-100"></div>
-
-        <!-- 추가 수당 -->
-        <div class="flex items-center justify-between py-2">
-          <div class="flex flex-col">
-            <span class="text-xs text-brand-600 font-medium mb-0.5">추가 수당</span>
-            <span class="text-sm text-gray-900 font-semibold">적용되나요?</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <span :class="diagnosis.extraPay.statusClass" class="text-sm font-bold">
-              {{ diagnosis.extraPay.statusText }}
-            </span>
-            <span class="text-lg">{{ diagnosis.extraPay.icon }}</span>
-          </div>
-        </div>
-
         <!-- 자세히 보기 버튼 -->
         <button
           @click="goToDiagnosisDetail"
@@ -116,6 +132,7 @@ const error = ref(false);
 
 const diagnosisData = ref({
   holidayPayEligible: false,
+  lastWeekHolidayPayEligible: false,
   retirementEligible: false,
   annualLeaveEligible: false,
   extraPayApplicable: false,
@@ -129,6 +146,11 @@ const diagnosis = computed(() => {
       icon: diagnosisData.value.holidayPayEligible ? '✅' : '❌',
       statusText: diagnosisData.value.holidayPayEligible ? '받을 수 있어요' : '아직 못 받아요',
       statusClass: diagnosisData.value.holidayPayEligible ? 'text-green-600' : 'text-red-600'
+    },
+    lastWeekHolidayPay: {
+      icon: diagnosisData.value.lastWeekHolidayPayEligible ? '✅' : '❌',
+      statusText: diagnosisData.value.lastWeekHolidayPayEligible ? '받을 수 있어요' : '못 받았어요',
+      statusClass: diagnosisData.value.lastWeekHolidayPayEligible ? 'text-green-600' : 'text-red-600'
     },
     retirement: {
       icon: diagnosisData.value.retirementEligible ? '✅' : '❌',
@@ -171,8 +193,20 @@ const fetchDiagnosisData = async () => {
     // 5인 이상 사업장이면 기본적으로 가산수당 적용 대상
     const extraPayApplicable = props.activeJob.is_workplace_over_5;
 
+    // 5. 지난 주 주휴수당 정보 조회
+    const today = new Date();
+    const lastWeekDate = new Date(today);
+    lastWeekDate.setDate(today.getDate() - 7);
+    const lastWeekDateStr = lastWeekDate.toISOString().split('T')[0];
+    
+    const lastWeekHolidayPayRes = await apiClient.get(`/labor/employees/${props.activeJob.id}/holiday-pay/`, {
+      params: { date: lastWeekDateStr }
+    });
+    const lastWeekHolidayPayData = lastWeekHolidayPayRes.data;
+
     diagnosisData.value = {
       holidayPayEligible: (holidayPayData.amount || 0) > 0,
+      lastWeekHolidayPayEligible: (lastWeekHolidayPayData.amount || 0) > 0,
       retirementEligible: retirementData.eligible || false,
       annualLeaveEligible: annualLeaveData.available > 0,
       extraPayApplicable,
@@ -187,7 +221,8 @@ const fetchDiagnosisData = async () => {
 };
 
 const goToDiagnosisDetail = () => {
-  router.push('/dashboard?section=diagnosis');
+  // 커스텀 이벤트 발생시켜 MainLayout에서 섹션 변경
+  window.dispatchEvent(new CustomEvent('go-section', { detail: 'diagnosis' }));
 };
 
 const refresh = () => {

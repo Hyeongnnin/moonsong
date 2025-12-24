@@ -95,7 +95,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'workplace_name', 'workplace_reg_no',
             'employment_type', 'is_workplace_over_5', 'start_date',
-            'hourly_rate', 'contract_weekly_hours',
+            'hourly_rate', 'contract_weekly_hours', 'deduction_type',
             'attendance_rate_last_year', 'total_wage_last_3m', 'total_days_last_3m',
             'work_records', 'schedules'
         ]
@@ -110,7 +110,7 @@ class EmployeeUpdateSerializer(serializers.ModelSerializer):
         fields = [
             'workplace_name', 'workplace_reg_no',
             'employment_type', 'is_workplace_over_5', 'start_date',
-            'hourly_rate', 'contract_weekly_hours',
+            'hourly_rate', 'contract_weekly_hours', 'deduction_type',
             'attendance_rate_last_year', 'total_wage_last_3m', 'total_days_last_3m'
         ]
 
@@ -145,9 +145,13 @@ class PayrollSummaryNestedSerializer(serializers.Serializer):
     base_pay = serializers.IntegerField()
     night_extra = serializers.IntegerField()
     holiday_extra = serializers.IntegerField()
+    weekly_holiday_pay = serializers.IntegerField(required=False, default=0)
+    total = serializers.IntegerField()
+    total_hours = serializers.FloatField()
     total = serializers.IntegerField()
     total_hours = serializers.FloatField()
     scheduled_hours = serializers.FloatField()
+    deduction = serializers.DictField(required=False)
 
 
 class PayrollSummarySerializer(serializers.Serializer):
@@ -168,6 +172,7 @@ class PayrollSummarySerializer(serializers.Serializer):
     night_hours = serializers.FloatField(required=False, default=0)
     night_bonus = serializers.IntegerField(required=False, default=0)
     estimated_monthly_pay = serializers.IntegerField(required=False, default=0)
+    net_pay = serializers.IntegerField(required=False, default=0)
     
     summary = PayrollSummaryNestedSerializer()
     rows = PayrollBreakdownSerializer(many=True) # breakdown -> rows

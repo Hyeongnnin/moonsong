@@ -7,7 +7,7 @@
           <div class="flex items-center justify-between">
             <div>
               <h2 class="text-xl font-bold text-gray-900">{{ year }}년 {{ month }}월 근무 스케줄 변경</h2>
-              <p class="text-sm text-gray-600 mt-1">이 달의 근무 스케줄만 변경됩니다. 다른 달의 스케줄에는 영향을 주지 않습니다.</p>
+
             </div>
             <button @click="close" class="text-gray-400 hover:text-gray-600 transition">
               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -27,12 +27,17 @@
           
           <div v-else class="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
             <p class="text-sm text-gray-600">
-              현재 기본 주간 스케줄을 사용 중입니다. 아래에서 이 달만의 스케줄을 설정할 수 있습니다.
+              이달의 근무스케줄을 바꿀 수 있어요. 일하기로 약속한 시간을 기록해보세요!<br>
+              (작성한 근로계약서 활용을 권장해요)
             </p>
           </div>
 
           <div class="mb-4 text-sm text-gray-600 flex items-center bg-gray-50 border border-gray-200 rounded-lg p-3">
-            각 요일의 휴게시간은 아래 근무시간 입력란에서 개별 설정할 수 있습니다.
+            휴게시간은 일하는 도중 쉬기로 약속한 시간이에요. 일한 시간에 포함되지 않아요.
+          </div>
+
+          <div class="mb-4 text-sm text-gray-600 flex items-center bg-gray-50 border border-gray-200 rounded-lg p-3">
+            24시 이후로도 일이 있다면 익일 근무에 체크해 주세요. 근무한 시간만 기록해 주시면 돼요!
           </div>
 
           <div class="space-y-3">
@@ -73,7 +78,7 @@
                 
                 <label class="ml-2 inline-flex items-center gap-2 text-sm cursor-pointer select-none">
                   <input type="checkbox" v-model="localSchedules[d.value].enabled" class="rounded border-gray-300 text-brand-600 focus:ring-brand-500" /> 
-                  <span :class="localSchedules[d.value].enabled ? 'text-gray-900' : 'text-gray-400'">활성</span>
+                  <span :class="localSchedules[d.value].enabled ? 'text-gray-900' : 'text-gray-400'">일하는 날</span>
                 </label>
               </div>
               

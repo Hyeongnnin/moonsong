@@ -565,77 +565,179 @@ def monthly_scheduled_dates(employee, year, month):
 def compute_monthly_schedule_stats(employee, year, month):
     """
     월별 근무 통계를 계산합니다.
-    실제 근무 기록(WorkRecord)만 사용하여 통계를 계산합니다.
-    스케줄 기반 예상 값은 포함하지 않습니다.
+    - 과거(~어제): 실제 근무 기록(WorkRecord) 기준
+    - 오늘: 실제 근무 기록이 있으면 그것, 없으면 스케줄(WorkSchedule/MonthlySchedule) 기준
+    - 미래(내일~):
+        - WorkRecord가 있고 attendance_status가 'ABSENT' 등인 경우: 0시간 (결근 확정)
+        - WorkRecord가 없는 경우: 스케줄 기준 근무 예정으로 계산
     
-    v4 (2025-01-15): 실제 근무 기록만 사용하도록 변경
-    - 삭제 후 통계가 남아있는 문제 수정
-    - cumulative_stats, monthly_scheduled_dates와 동일한 로직 적용
+    v5 (2025-01-15): 미래 예정된 근무도 포함하도록 변경
     """
     from django.utils import timezone
+    import calendar
     
     # 오늘 날짜
     today = timezone.localdate()
     
     hourly_rate = float(employee.hourly_rate)
-
-    # 이번 달의 실제 근무 기록만 가져오기
+    
+    # 해당 월의 마지막 날 계산
+    _, last_day = calendar.monthrange(year, month)
+    month_start = date(year, month, 1)
+    month_end = date(year, month, last_day)
+    
+    # 해당 월의 모든 WorkRecord 조회 (한 번에 쿼리)
     work_records = WorkRecord.objects.filter(
         employee=employee,
         work_date__year=year,
         work_date__month=month
     )
-
-    # 실제 근무 기록 기반으로만 시간 계산
-    actual_hours_worked = sum(float(wr.get_total_hours()) for wr in work_records)
+    records_map = {wr.work_date: wr for wr in work_records}
     
-    # 실제 근무일 수 계산 (0시간 기록 제외)
-    actual_work_days = sum(1 for wr in work_records if wr.get_total_hours() > 0)
-
-    # 총 근무 시간 = 실제 근무 시간만 (스케줄 예상 값 제외)
-    total_hours = actual_hours_worked
-    total_days = actual_work_days
+    total_hours = 0.0
+    total_days = 0
+    total_salary = Decimal('0')
     
-    # 총 급여 계산
-    total_salary = total_hours * hourly_rate
+    # 1일부터 말일까지 순회
+    current = month_start
+    while current <= month_end:
+        record = records_map.get(current)
+        daily_hours = 0.0
+        is_paid_day = False # 근무일 수 산정용 (유급 인정일)
+        
+        # 1. 실제 기록이 있는 경우 (가장 확실)
+        if record:
+            # 출결 상태에 따른 처리
+            status = record.attendance_status
+            
+            # 결근/병가/무급휴가는 0시간
+            if status in ['ABSENT', 'SICK_LEAVE', 'UNPAID_LEAVE']:
+                daily_hours = 0.0
+            
+            # 근무/연차/추가근무 등은 시간 인정
+            else:
+                # 실제 시간 입력이 있으면 그것을 사용
+                if record.time_in and record.time_out:
+                    daily_hours = float(record.get_total_hours())
+                    is_paid_day = True
+                
+                # 시간 입력은 없지만(아직 미입력 등) 스케줄상 근무일이면 스케줄 시간 적용 (미래이거나 오늘인데 아직 입력 안한 경우)
+                # 단, 'EXTRA_WORK'인데 시간 없으면 0으로 둬야 함 (추가근무는 스케줄이 없으므로)
+                elif status == 'REGULAR_WORK' or status == 'ANNUAL_LEAVE':
+                    # 스케줄 정보 가져오기
+                    s_info = employee.get_schedule_for_date(current)
+                    if s_info['is_scheduled']:
+                        dummy_date = date(2000, 1, 1)
+                        if s_info['start_time'] and s_info['end_time']:
+                            dt_start = datetime.combine(dummy_date, s_info['start_time'])
+                            dt_end = datetime.combine(dummy_date, s_info['end_time'])
+                            if dt_end < dt_start:
+                                dt_end += timedelta(days=1)
+                            
+                            duration = dt_end - dt_start
+                            total_mins = (duration.total_seconds() / 60.0) + float(s_info.get('next_day_work_minutes', 0))
+                            break_mins = float(s_info.get('break_minutes', 0))
+                            daily_hours = max(0.0, (total_mins - break_mins) / 60.0)
+                            is_paid_day = True
+        
+        # 2. 기록이 없는 경우
+        else:
+            # 과거(~어제)인데 기록이 없다 -> 근무 안 한 것으로 간주 (0시간)
+            if current < today:
+                daily_hours = 0.0
+            
+            # 오늘 또는 미래 -> 스케줄이 있으면 근무 예정으로 계산
+            else:
+                s_info = employee.get_schedule_for_date(current)
+                if s_info['is_scheduled']:
+                    dummy_date = date(2000, 1, 1)
+                    if s_info['start_time'] and s_info['end_time']:
+                        dt_start = datetime.combine(dummy_date, s_info['start_time'])
+                        dt_end = datetime.combine(dummy_date, s_info['end_time'])
+                        if dt_end < dt_start:
+                            dt_end += timedelta(days=1)
+                        
+                        duration = dt_end - dt_start
+                        total_mins = (duration.total_seconds() / 60.0) + float(s_info.get('next_day_work_minutes', 0))
+                        break_mins = float(s_info.get('break_minutes', 0))
+                        daily_hours = max(0.0, (total_mins - break_mins) / 60.0)
+                        is_paid_day = True
+
+        if daily_hours > 0:
+            total_hours += daily_hours
+            total_salary += Decimal(str(daily_hours)) * Decimal(str(hourly_rate))
+        
+        if is_paid_day:
+            total_days += 1
+            
+        current += timedelta(days=1)
+
 
     # ============================================================
-    # 이번 주 통계 계산 (주휴수당 계산용)
-    # 실제 근무 기록만 사용
+    # 이번 주 통계 계산 (주휴수당 계산용 + 미래 예정 포함)
     # ============================================================
     start_of_week = today - timedelta(days=today.weekday())
     end_of_week = start_of_week + timedelta(days=6)
     
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.info(f'[compute_monthly_schedule_stats] Computing this week stats')
-    logger.info(f'  Today: {today}')
-    logger.info(f'  Week range: {start_of_week} ~ {end_of_week}')
-    
-    # 이번 주에 속한 모든 실제 근로기록 조회
-    actual_this_week_records = WorkRecord.objects.filter(
+    week_records = WorkRecord.objects.filter(
         employee=employee,
-        work_date__gte=start_of_week, 
-        work_date__lte=min(end_of_week, today)  # 오늘까지만
+        work_date__range=[start_of_week, end_of_week]
     )
-    actual_this_week_hours = Decimal('0')
-    for wr in actual_this_week_records:
-        hours = wr.get_total_hours()
-        actual_this_week_hours += Decimal(str(hours))
-        logger.info(f'  Work record on {wr.work_date}: {hours} hours')
+    week_records_map = {wr.work_date: wr for wr in week_records}
     
-    logger.info(f'  Total actual hours this week: {actual_this_week_hours}')
+    total_this_week_hours = 0.0
     
-    # 스케줄 예상 시간 제외 (실제 근무 기록만 사용)
-    total_this_week_hours = actual_this_week_hours
-    logger.info(f'  Total this week hours: {total_this_week_hours}')
+    curr_week = start_of_week
+    while curr_week <= end_of_week:
+        # 이번 달 통계와 동일한 로직 적용 (함수화하면 좋겠지만 일단 인라인)
+        d_hours = 0.0
+        w_record = week_records_map.get(curr_week)
+        
+        if w_record:
+            if w_record.attendance_status in ['ABSENT', 'SICK_LEAVE', 'UNPAID_LEAVE']:
+                d_hours = 0.0
+            else:
+                if w_record.time_in and w_record.time_out:
+                    d_hours = float(w_record.get_total_hours())
+                elif w_record.attendance_status in ['REGULAR_WORK', 'ANNUAL_LEAVE']:
+                    s_info = employee.get_schedule_for_date(curr_week)
+                    if s_info['is_scheduled']:
+                        # (스케줄 시간 계산 생략... 간단히 처리위해 같은 로직)
+                        # 여기서는 정확성을 위해 위와 동일하게 계산
+                         dummy_date = date(2000, 1, 1)
+                         if s_info['start_time'] and s_info['end_time']:
+                            dt_start = datetime.combine(dummy_date, s_info['start_time'])
+                            dt_end = datetime.combine(dummy_date, s_info['end_time'])
+                            if dt_end < dt_start:
+                                dt_end += timedelta(days=1)
+                            dur = (dt_end - dt_start).total_seconds() / 60.0 + float(s_info.get('next_day_work_minutes', 0))
+                            brk = float(s_info.get('break_minutes', 0))
+                            d_hours = max(0.0, (dur - brk) / 60.0)
+        else:
+            if curr_week < today:
+                d_hours = 0.0
+            else:
+                s_info = employee.get_schedule_for_date(curr_week)
+                if s_info['is_scheduled']:
+                     dummy_date = date(2000, 1, 1)
+                     if s_info['start_time'] and s_info['end_time']:
+                        dt_start = datetime.combine(dummy_date, s_info['start_time'])
+                        dt_end = datetime.combine(dummy_date, s_info['end_time'])
+                        if dt_end < dt_start:
+                            dt_end += timedelta(days=1)
+                        dur = (dt_end - dt_start).total_seconds() / 60.0 + float(s_info.get('next_day_work_minutes', 0))
+                        brk = float(s_info.get('break_minutes', 0))
+                        d_hours = max(0.0, (dur - brk) / 60.0)
+        
+        total_this_week_hours += d_hours
+        curr_week += timedelta(days=1)
 
     return {
         "scheduled_total_hours": total_hours,
-        "scheduled_estimated_salary": total_salary,
+        "scheduled_estimated_salary": float(total_salary),
         "scheduled_work_days": total_days,
         "scheduled_this_week_hours": float(total_this_week_hours),
-        "scheduled_this_week_estimated_salary": float(total_this_week_hours * Decimal(str(hourly_rate))),
+        "scheduled_this_week_estimated_salary": float(Decimal(str(total_this_week_hours)) * Decimal(str(hourly_rate))),
     }
 
 
@@ -1055,6 +1157,7 @@ def compute_payroll_summary(employee, year, month):
     
     hourly_wage = int(employee.hourly_rate)
     breakdown = []
+    notes = []  # Initialize notes early
     
     # 야간 수당 계산을 위한 헬퍼 함수 (Scheduled 용)
     def calculate_scheduled_night_hours(st, et, is_overnight, next_day_mins):
@@ -1140,21 +1243,21 @@ def compute_payroll_summary(employee, year, month):
                 if day_night_hours > 0:
                     day_night_bonus = int(day_night_hours * hourly_wage * 0.5)
             
-            # 미래 날짜는 아예 집계에서 제외 (사용자 요청: 아직 오지 않은 날짜의 예상액/예정시간 산출 방지)
-            if curr <= today:
-                total_hours += hours
-                if source == 'actual':
-                    actual_hours += hours
-                else:
-                    scheduled_hours += hours
-                
-                # 급여 및 수당도 오늘 이전/현재일 때만 합산
-                base_pay += day_pay
-                holiday_bonus += day_holiday_bonus
-                night_hours += day_night_hours
-                night_bonus += day_night_bonus
-                if is_holiday:
-                    holiday_hours += hours
+            # 미래 날짜도 집계에 포함 (사용자 요청: 예정된 근무도 통계 및 예상 급여에 반영)
+            # if curr <= today:  <-- 조건 제거
+            total_hours += hours
+            if source == 'actual':
+                actual_hours += hours
+            else:
+                scheduled_hours += hours
+            
+            # 급여 및 수당도 합산
+            base_pay += day_pay
+            holiday_bonus += day_holiday_bonus
+            night_hours += day_night_hours
+            night_bonus += day_night_bonus
+            if is_holiday:
+                holiday_hours += hours
             
             # 내역(breakdown)에는 포함하되 미래 여부 표시
             breakdown.append({
@@ -1164,39 +1267,96 @@ def compute_payroll_summary(employee, year, month):
                 "night_hours": round(day_night_hours, 1),
                 "is_holiday": is_holiday,
                 "holiday_type": holiday_type,
-                "day_pay": day_pay if curr <= today else 0,
-                "holiday_bonus": day_holiday_bonus if curr <= today else 0,
-                "night_bonus": day_night_bonus if curr <= today else 0,
+                "day_pay": day_pay,
+                "holiday_bonus": day_holiday_bonus,
+                "night_bonus": day_night_bonus,
                 "is_future": curr > today
             })
             
         curr += timedelta(days=1)
         
     # 합계 계산
-    total_extra = holiday_bonus + night_bonus
-    estimated_monthly_pay = base_pay + total_extra
     
+    # 주휴수당 계산 (이번 달 전체 예상)
+    from .services import get_monthly_holiday_pay_info
+    holiday_pay_info = get_monthly_holiday_pay_info(employee, year, month)
+    monthly_weekly_holiday_pay = int(holiday_pay_info['estimated_total'])
+    
+    total_extra = holiday_bonus + night_bonus
+    # 최종 예상 급여 = 기본급 + 추가수당(야간/휴일) + 주휴수당
+    estimated_monthly_pay = base_pay + total_extra + monthly_weekly_holiday_pay
+    
+    # 공제 계산 (v2.1)
+    import math
+
+    gross_pay = estimated_monthly_pay
+    deduction_summary = {
+        'type': employee.deduction_type, # NONE, FOUR_INSURANCE, FREELANCE
+        'total_deduction': 0,
+        'net_pay': gross_pay,
+        'details': []
+    }
+
+    if employee.deduction_type == 'FOUR_INSURANCE':
+        # 국민연금 4.5%
+        pension = math.floor((gross_pay * 0.045) / 10) * 10
+        # 건강보험 3.545%
+        health = math.floor((gross_pay * 0.03545) / 10) * 10
+        # 장기요양보험 (건강보험의 12.95%)
+        care = math.floor((health * 0.1295) / 10) * 10
+        # 고용보험 0.9%
+        employment = math.floor((gross_pay * 0.009) / 10) * 10
+        
+        total_deduction = pension + health + care + employment
+        deduction_summary['total_deduction'] = total_deduction
+        deduction_summary['net_pay'] = gross_pay - total_deduction
+        deduction_summary['details'] = [
+            {'label': '국민연금 (4.5%)', 'amount': pension},
+            {'label': '건강보험 (3.545%)', 'amount': health},
+            {'label': '장기요양 (건보의 12.95%)', 'amount': care},
+            {'label': '고용보험 (0.9%)', 'amount': employment},
+        ]
+        notes.append("4대보험료는 예상 요율(2025년 기준)로 계산되었으며 실제와 다를 수 있습니다.")
+        
+    elif employee.deduction_type == 'FREELANCE':
+        # 3.3%
+        tax = math.floor((gross_pay * 0.033) / 10) * 10
+        deduction_summary['total_deduction'] = tax
+        deduction_summary['net_pay'] = gross_pay - tax
+        deduction_summary['details'] = [
+            {'label': '사업소득세 (3.3%)', 'amount': tax}
+        ]
+        notes.append("프리랜서(사업소득) 3.3% 원천징수 기준으로 계산되었습니다.")
+        
+    else:
+        # 미선택
+        notes.append("현재 공제 방식이 선택되지 않아 세전 기준 급여로 계산되었습니다.")
+        notes.append("정확한 실수령액을 알고 싶다면 근로정보 수정에서 공제 방식을 선택해주세요.")
+
     # 사용자 요구사항에 맞춘 summary 구조 (v2)
     summary = {
         "base_pay": base_pay,
         "night_extra": night_bonus,
         "holiday_extra": holiday_bonus,
-        "total": estimated_monthly_pay,
+        "weekly_holiday_pay": monthly_weekly_holiday_pay, 
+        "total": estimated_monthly_pay, # 세전 총액
         "total_hours": round(total_hours, 1),
-        "scheduled_hours": round(scheduled_hours, 1)
+        "scheduled_hours": round(scheduled_hours, 1),
+        "deduction": deduction_summary # 공제 정보 추가
     }
     
-    notes = [
+    notes.extend([
         "실제 근로기록이 있으면 실제시간을, 없으면 스케줄 기반 예정시간을 사용합니다.",
-        f"오늘({today.isoformat()}) 이후의 근로 예정분은 통계 및 예상 급여에서 제외됩니다."
-    ]
+        f"오늘({today.isoformat()}) 이후의 근로 예정분도 통계 및 예상 급여에 포함됩니다.",
+        "예상 주휴수당이 포함된 금액입니다. (주 15시간 이상 & 개근 시 발생)"
+    ])
     
     if employee.is_workplace_over_5:
         notes.append("본 급여는 근로기준법(5인 이상 사업장)에 따라 야간근로 및 휴일근로 가산수당이 반영되었습니다.")
     else:
         notes.append("본 사업장은 5인 미만 사업장으로 야간·휴일 근로에 대한 가산수당이 적용되지 않습니다. (근로기준법 제11조)")
     
-    notes.append("연장근로 가산, 중복가산, 연차 유급 처리 등은 이번 버전에서 미적용되었습니다.")
+    notes.append("모든 공제 계산은 '예상 계산'이며 실제 급여 및 공제는 사업장/세무 처리 기준에 따라 달라질 수 있습니다.")
 
     return {
         "month": f"{year}-{month:02d}",
@@ -1211,8 +1371,10 @@ def compute_payroll_summary(employee, year, month):
         "base_pay": base_pay,
         "holiday_bonus": holiday_bonus,
         "night_bonus": night_bonus,
-        "estimated_monthly_pay": estimated_monthly_pay, # 하위 호환성 유지
+        "monthly_weekly_holiday_pay": monthly_weekly_holiday_pay, 
+        "estimated_monthly_pay": estimated_monthly_pay, # 세전
+        "net_pay": deduction_summary['net_pay'], # 세후 (최상위에도 노출)
         "summary": summary,
-        "rows": breakdown, # breakdown을 rows로 명칭 변경
+        "rows": breakdown, 
         "notes": notes
     }

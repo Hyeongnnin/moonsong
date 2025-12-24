@@ -125,9 +125,9 @@
           >
             주휴일
           </span>
-          <!-- 출결 상태 표시 (소정근로일 여부와 무관하게, 값이 있으면 표시) -->
+          <!-- 출결 상태 표시 (소정근로일이거나, 값이 있으면 표시) -->
           <span
-            v-else-if="!isFutureMonth && getAttendanceStatus(dayObj.dateIso)"
+            v-else-if="(isScheduledWorkday(dayObj.dateIso) || getAttendanceStatus(dayObj.dateIso))"
             class="text-[10px] font-semibold text-orange-600 leading-tight text-center px-1 truncate max-w-full"
           >
             {{ getAttendanceStatusLabel(dayObj.dateIso) }}
@@ -579,7 +579,14 @@ const getAttendanceStatus = (dateIso?: string): string | null => {
 // 출결 상태 한글 라벨
 const getAttendanceStatusLabel = (dateIso?: string): string => {
   const status = getAttendanceStatus(dateIso);
-  if (!status) return '결근';
+  
+  if (!status) {
+    // 기록이 없지만 소정근로일인 경우 '근무' (예정) 표시
+    if (isScheduledWorkday(dateIso)) {
+        return '근무';
+    }
+    return '결근';
+  }
   
   const statusLabels: Record<string, string> = {
     'REGULAR_WORK': '근무',
@@ -597,9 +604,10 @@ const cellTitle = (dateIso?: string, scheduled?: boolean): string => {
   if (!dateIso) return '';
   const parts: string[] = [];
   if (isFutureMonth.value) {
-    parts.push('미래 월에는 근로 기록을 입력할 수 없습니다');
+    // parts.push('미래 월에는 근로 기록을 입력할 수 없습니다'); // 삭제
+    parts.push('미래 근무 예정');
   } else {
-    parts.push(`${dateIso}: ${scheduled ? 'Recorded' : 'Not recorded'}`);
+    parts.push(`${dateIso}: ${scheduled ? 'Workday' : 'Day off'}`);
   }
   const holidayName = holidayNameForDate(dateIso);
   if (holidayName) {
@@ -866,8 +874,6 @@ async function deleteMonthlyRecords() {
   // 확인 다이얼로그
   const confirmed = confirm(
     `${yearMonth}의 모든 근로 기록을 삭제하시겠습니까?\n\n` +
-    `• 실제 근로기록 (WorkRecord)\n` +
-    `• 월별 스케줄 설정 (MonthlySchedule)\n\n` +
     `삭제된 기록은 복구할 수 없으며, 통계 및 주휴수당, 알바 업적 등 모든 연동된 데이터가 함께 업데이트됩니다.`
   );
   

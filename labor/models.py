@@ -17,10 +17,22 @@ class Employee(models.Model):
     start_date = models.DateField()
     hourly_rate = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     # 추가 필드 (노동법 평가용) - 단순화된 참고 계산을 위한 데이터
+    class DeductionType(models.TextChoices):
+        NONE = 'NONE', '미선택 (세전)'
+        FOUR_INSURANCE = 'FOUR_INSURANCE', '4대보험'
+        FREELANCE = 'FREELANCE', '3.3% (프리랜서)'
+
     attendance_rate_last_year = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True, help_text="작년 출근율 0~1")
     total_wage_last_3m = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, help_text="최근 3개월 총임금")
     total_days_last_3m = models.IntegerField(null=True, blank=True, help_text="최근 3개월 총일수")
     contract_weekly_hours = models.DecimalField(max_digits=4, decimal_places=1, null=True, blank=True, help_text="계약상 주 소정근로시간")
+    
+    deduction_type = models.CharField(
+        max_length=20,
+        choices=DeductionType.choices,
+        default=DeductionType.NONE,
+        help_text="급여 공제 방식"
+    )
 
     class Meta:
         verbose_name = "Job"

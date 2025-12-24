@@ -3,7 +3,7 @@
     <div class="max-w-4xl mx-auto">
       <!-- 현재 선택된 알바 정보 표시 (헤더) -->
       <div v-if="activeJob" class="mb-6 pb-4 border-b border-gray-200">
-        <p class="text-sm text-gray-600 mb-1">현재 선택된 알바</p>
+
         <div class="flex items-center justify-between">
           <div>
             <h2 class="text-2xl font-bold text-gray-900">{{ activeJob.workplace_name }}</h2>

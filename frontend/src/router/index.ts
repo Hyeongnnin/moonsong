@@ -6,6 +6,7 @@ const MainLayout = () => import("../components/MainLayout.vue");
 const LandingPage = () => import("../components/LandingPage.vue");
 const LoginPage = () => import("../components/LoginPage.vue");
 const SignupPage = () => import("../components/SignupPage.vue");
+const FindAccountPage = () => import("../components/FindAccountPage.vue");
 
 // Profile edit page
 const EditProfile = () => import("../pages/EditProfile.vue");
@@ -19,6 +20,7 @@ const routes: Array<RouteRecordRaw> = [
       { path: "", component: LandingPage },
       { path: "login", component: LoginPage },
       { path: "signup", component: SignupPage },
+      { path: "find-account", component: FindAccountPage },
     ],
   },
 

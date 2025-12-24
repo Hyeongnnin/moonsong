@@ -1,6 +1,17 @@
 <template>
   <div class="space-y-4">
-    <p class="text-sm text-gray-600">저장 시 캘린더 전체 근로시간이 변경돼요! 월별 및 일별 근로정보 변경은 캘린더에서 해주세요.</p>
+    <div class="mb-4 text-sm text-gray-600 block bg-gray-50 border border-gray-200 rounded-lg p-3">
+      근로시작일 부터 일한 날짜와 시간을 설정할 수 있어요. 월별 및 일별 근로정보 변경은 캘린더에서 해주세요!<br>
+      (작성한 근로계약서 활용을 권장해요)
+    </div>
+    
+    <div class="mb-4 text-sm text-gray-600 flex items-center bg-gray-50 border border-gray-200 rounded-lg p-3">
+      휴게시간은 일하는 도중 쉬기로 약속한 시간이에요. 일한 시간에 포함되지 않아요.
+    </div>
+
+    <div class="mb-4 text-sm text-gray-600 flex items-center bg-gray-50 border border-gray-200 rounded-lg p-3">
+      24시 이후로도 일이 있다면 익일 근무에 체크해 주세요. 근무한 시간만 기록해 주시면 돼요!
+    </div>
     <div class="grid grid-cols-1 gap-3">
       <div v-for="d in weekdays" :key="d.value" class="border rounded-lg p-3 bg-gray-50">
         <div class="flex items-center gap-3 mb-2">

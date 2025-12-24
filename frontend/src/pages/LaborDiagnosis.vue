@@ -3,7 +3,7 @@
     <!-- 헤더 -->
     <div class="mb-6">
       <h1 class="text-2xl font-bold text-gray-900 mb-2">근로진단</h1>
-      <p class="text-sm text-gray-600">현재 근로 조건이 법적 기준을 충족하는지 확인하세요.</p>
+      <p class="text-sm text-gray-600">현재 알바는 어떤 근로조건인지 확인해 보세요</p>
     </div>
 
     <!-- 근로정보가 없을 때 -->
@@ -21,21 +21,109 @@
 
     <!-- 근로정보가 있을 때 -->
     <div v-else class="space-y-8">
-      <!-- 1. 주휴수당 진단 카드 -->
+      <!-- 1. 추가 수당 진단 카드 -->
       <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
         <div class="p-6">
-          <!-- (1) 한 줄 요약 -->
+          <div class="flex items-center gap-3 mb-4">
+            <span class="text-3xl">{{ extraPayDiagnosis.icon }}</span>
+            <h2 class="text-xl font-bold text-gray-900">{{ extraPayDiagnosis.title }}</h2>
+          </div>
+
+          <p class="text-gray-700 mb-6 bg-brand-50 p-4 rounded-lg border border-brand-100">
+            {{ extraPayDiagnosis.description }}
+          </p>
+
+          <div class="bg-gray-50 rounded-lg p-5 mb-6">
+            <h3 class="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+              📊 내 사업장 정보
+            </h3>
+            <div class="flex items-center justify-between">
+              <span class="text-sm text-gray-600">사업장 규모</span>
+              <span class="text-sm font-bold" :class="activeJob.is_workplace_over_5 ? 'text-brand-600' : 'text-gray-600'">
+                {{ activeJob.is_workplace_over_5 ? '5인 이상 사업장' : '5인 미만 사업장' }}
+              </span>
+            </div>
+          </div>
+
+          <div class="border-t border-gray-100 pt-6">
+            <h3 class="text-sm font-bold text-gray-900 mb-2">💡 야간·휴일 수당이란?</h3>
+            <p class="text-sm text-gray-600 leading-relaxed">
+              밤 10시부터 다음날 아침 6시 사이에 일하거나(야간), 쉬는 날(휴일)에 일할 때 받는 추가 금전적 보상이에요. 
+              보통 원래 시급의 50%를 더 받게 되는데, 이 규정은 5인 이상 사업장에만 적용됩니다.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 1.5 지난 주 주휴수당 진단 카드 -->
+      <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+        <div class="p-6">
+          <div class="flex items-center gap-3 mb-4">
+            <span class="text-3xl">{{ lastWeekHolidayPayDiagnosis.icon }}</span>
+            <h2 class="text-xl font-bold text-gray-900">{{ lastWeekHolidayPayDiagnosis.title }}</h2>
+          </div>
+
+          <p class="text-gray-700 mb-6 bg-brand-50 p-4 rounded-lg border border-brand-100">
+            {{ lastWeekHolidayPayDiagnosis.description }}
+          </p>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
+            <div 
+              v-for="criterion in lastWeekHolidayPayCriteria" 
+              :key="criterion.key"
+              :class="getCriterionBadgeClass(criterion.status)"
+              class="flex items-center gap-2 p-3 rounded-lg border font-medium"
+            >
+              <span>{{ getCriterionEmoji(criterion.status) }}</span>
+              <span>{{ criterion.label }}</span>
+            </div>
+          </div>
+
+          <div class="bg-gray-50 rounded-lg p-5 mb-6">
+            <h3 class="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+              📊 지난 주 데이터 확인
+            </h3>
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div>
+                <p class="text-xs text-gray-500 mb-1">지난 주 근무</p>
+                <p class="text-sm font-semibold text-gray-900">{{ lastWeekHolidayPayData.weekly_hours }}시간</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-500 mb-1">기준 시간</p>
+                <p class="text-sm font-semibold text-gray-900">{{ lastWeekHolidayPayData.threshold }}시간</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-500 mb-1">대상 기간</p>
+                <p class="text-sm font-semibold text-gray-900">{{ formatDateRange(lastWeekHolidayPayData.week_start, lastWeekHolidayPayData.week_end) }}</p>
+              </div>
+              <div v-if="lastWeekHolidayPayData.eligible">
+                <p class="text-xs text-gray-500 mb-1">주휴수당</p>
+                <p class="text-sm font-bold text-brand-600">{{ formatCurrency(lastWeekHolidayPayData.amount) }}</p>
+              </div>
+            </div>
+          </div>
+          <div class="border-t border-gray-100 pt-6">
+            <h3 class="text-sm font-bold text-gray-900 mb-2">💡 주휴수당이란?</h3>
+            <p class="text-sm text-gray-600 leading-relaxed">
+              일주일 동안 정해진 근무일(소정근로일)에 모두 출근하고, 주 15시간 이상 근무한 분들에게 주어지는 <strong>유급 휴일 수당</strong>이에요. 
+              쉽게 말해, 일주일간 고생한 당신에게 나라에서 정한 '유급 휴식'에 대한 보상이라고 생각하면 돼요!
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. 주휴수당 진단 카드 -->
+      <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+        <div class="p-6">
           <div class="flex items-center gap-3 mb-4">
             <span class="text-3xl">{{ holidayPayDiagnosis.icon }}</span>
             <h2 class="text-xl font-bold text-gray-900">{{ holidayPayDiagnosis.title }}</h2>
           </div>
 
-          <!-- (2) 바로 이해되는 이유 설명 -->
           <p class="text-gray-700 mb-6 bg-brand-50 p-4 rounded-lg border border-brand-100">
             {{ holidayPayDiagnosis.description }}
           </p>
 
-          <!-- (3) 조건 시각화 -->
           <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
             <div 
               v-for="criterion in holidayPayCriteria" 
@@ -48,7 +136,6 @@
             </div>
           </div>
 
-          <!-- (4) 내 데이터 연결 -->
           <div class="bg-gray-50 rounded-lg p-5 mb-6">
             <h3 class="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
               📊 내 데이터 확인
@@ -73,7 +160,6 @@
             </div>
           </div>
 
-          <!-- (5) 쉬운 개념 설명 -->
           <div class="border-t border-gray-100 pt-6">
             <h3 class="text-sm font-bold text-gray-900 mb-2">💡 주휴수당이란?</h3>
             <p class="text-sm text-gray-600 leading-relaxed">
@@ -84,7 +170,7 @@
         </div>
       </div>
 
-      <!-- 2. 퇴직금 진단 카드 -->
+      <!-- 3. 퇴직금 진단 카드 -->
       <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
         <div class="p-6">
           <div class="flex items-center gap-3 mb-4">
@@ -133,7 +219,7 @@
         </div>
       </div>
 
-      <!-- 3. 연차휴가 진단 카드 -->
+      <!-- 4. 연차휴가 진단 카드 -->
       <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
         <div class="p-6">
           <div class="flex items-center gap-3 mb-4">
@@ -181,40 +267,6 @@
             <p class="text-sm text-gray-600 leading-relaxed">
               입사한 지 1년 미만일 때는 한 달 개근할 때마다 1일씩 생기고, 1년이 되면 총 15일의 연차휴가가 생겨요. 
               단, 5인 이상 사업장에서 주 15시간 이상 일하는 경우에만 법적으로 보장됩니다.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <!-- 4. 추가 수당 진단 카드 -->
-      <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-        <div class="p-6">
-          <div class="flex items-center gap-3 mb-4">
-            <span class="text-3xl">{{ extraPayDiagnosis.icon }}</span>
-            <h2 class="text-xl font-bold text-gray-900">{{ extraPayDiagnosis.title }}</h2>
-          </div>
-
-          <p class="text-gray-700 mb-6 bg-brand-50 p-4 rounded-lg border border-brand-100">
-            {{ extraPayDiagnosis.description }}
-          </p>
-
-          <div class="bg-gray-50 rounded-lg p-5 mb-6">
-            <h3 class="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-              📊 내 사업장 정보
-            </h3>
-            <div class="flex items-center justify-between">
-              <span class="text-sm text-gray-600">사업장 규모</span>
-              <span class="text-sm font-bold" :class="activeJob.is_workplace_over_5 ? 'text-brand-600' : 'text-gray-600'">
-                {{ activeJob.is_workplace_over_5 ? '5인 이상 사업장' : '5인 미만 사업장' }}
-              </span>
-            </div>
-          </div>
-
-          <div class="border-t border-gray-100 pt-6">
-            <h3 class="text-sm font-bold text-gray-900 mb-2">💡 야간·휴일 수당이란?</h3>
-            <p class="text-sm text-gray-600 leading-relaxed">
-              밤 10시부터 다음날 아침 6시 사이에 일하거나(야간), 쉬는 날(휴일)에 일할 때 받는 추가 금전적 보상이에요. 
-              보통 원래 시급의 50%를 더 받게 되는데, 이 규정은 5인 이상 사업장에만 적용됩니다.
             </p>
           </div>
         </div>
@@ -312,13 +364,13 @@ const holidayPayDiagnosis = computed(() => {
   if (holidayPayData.value.eligible) {
     return {
       icon: '✅',
-      title: '주휴수당을 받을 수 있어요!',
+      title: '이번 주 주휴수당을 받을 수 있어요!',
       description: '이번 주 근무시간과 출석 요건을 모두 채우셨네요. 다음 급여 때 주휴수당이 포함되는지 꼭 확인해보세요.'
     };
   }
   return {
     icon: '❌',
-    title: '주휴수당을 아직 받을 수 없어요',
+    title: '이번 주 주휴수당을 아직 받을 수 없어요',
     description: holidayPayData.value.reason === 'less_than_threshold' 
       ? `주간 근무시간이 ${holidayPayData.value.threshold}시간 미만이라 주휴수당 지급 조건을 충족하지 못했어요.`
       : holidayPayData.value.reason === 'not_perfect_attendance'
@@ -330,6 +382,49 @@ const holidayPayDiagnosis = computed(() => {
 // 주휴수당 요건 배지 배열
 const holidayPayCriteria = computed(() => {
   const criteria = holidayPayData.value.criteria;
+  return [
+    { key: 'is_worker', ...criteria.is_worker },
+    { key: 'weekly_hours', ...criteria.weekly_hours },
+    { key: 'attendance', ...criteria.attendance }
+  ];
+});
+
+const lastWeekHolidayPayData = ref({
+  eligible: false,
+  amount: 0,
+  weekly_hours: 0,
+  threshold: 15,
+  reason: '',
+  week_start: '',
+  week_end: '',
+  criteria: {
+    is_worker: { status: 'unknown', label: '근로자 요건', detail: '' },
+    weekly_hours: { status: 'unknown', label: '주 15시간 이상', detail: '' },
+    attendance: { status: 'unknown', label: '개근', detail: '' }
+  }
+});
+
+const lastWeekHolidayPayDiagnosis = computed(() => {
+  if (lastWeekHolidayPayData.value.eligible) {
+    return {
+      icon: '✅',
+      title: '지난 주 주휴수당을 받을 수 있어요!',
+      description: '지난 주 근무 요건을 모두 충족했어요. 급여 지급 시 확인해 보세요.'
+    };
+  }
+  return {
+    icon: '❌',
+    title: '지난 주 주휴수당은 받지 못했어요',
+    description: lastWeekHolidayPayData.value.reason === 'less_than_threshold' 
+      ? `지난 주 근무시간이 ${lastWeekHolidayPayData.value.threshold}시간 미만이었어요.`
+      : lastWeekHolidayPayData.value.reason === 'not_perfect_attendance'
+      ? '지난 주 결근이 있어서 주휴수당 조건을 채우지 못했어요.'
+      : '지난 주 근무 기록이 부족하거나 조건이 맞지 않아요.'
+  };
+});
+
+const lastWeekHolidayPayCriteria = computed(() => {
+  const criteria = lastWeekHolidayPayData.value.criteria;
   return [
     { key: 'is_worker', ...criteria.is_worker },
     { key: 'weekly_hours', ...criteria.weekly_hours },
@@ -422,7 +517,7 @@ const fetchDiagnosisData = async () => {
     const data = response.data;
 
     const eligible = data.amount > 0;
-    const weeklyHours = data.actual_worked_hours || data.weekly_hours || 0;
+    const weeklyHours = data.actual_worked_hours || data.weekly_scheduled_hours || data.weekly_hours || 0;
     const threshold = data.policy_threshold || 15;
     const reason = data.reason || '';
 
@@ -439,10 +534,11 @@ const fetchDiagnosisData = async () => {
         detail: weeklyHours >= threshold ? '충족' : `미충족 (현재 ${weeklyHours.toFixed(1)}시간)`
       },
       attendance: {
-        status: reason === 'absent' ? 'fail' as const : 
+        status: (reason === 'absent' || reason === 'not_perfect_attendance') ? 'fail' as const : 
                 reason === 'no_schedule' ? 'unknown' as const : 'pass' as const,
         label: '개근',
         detail: reason === 'absent' ? `결근 발생` :
+                reason === 'not_perfect_attendance' ? '결근 발생' :
                 reason === 'no_schedule' ? '판단 불가' :
                 eligible ? '충족' : '확인 필요'
       }
@@ -457,6 +553,52 @@ const fetchDiagnosisData = async () => {
       week_start: data.week_start || '',
       week_end: data.week_end || '',
       criteria
+    };
+
+    // 1.5 지난 주 주휴수당 조회
+    const today = new Date();
+    const lastWeekDate = new Date(today);
+    lastWeekDate.setDate(today.getDate() - 7);
+    const lastWeekDateStr = lastWeekDate.toISOString().split('T')[0];
+
+    const lwResponse = await apiClient.get(`/labor/employees/${activeJob.value.id}/holiday-pay/`, { params: { date: lastWeekDateStr } });
+    const lwData = lwResponse.data;
+
+    const lwEligible = lwData.amount > 0;
+    const lwWeeklyHours = lwData.actual_worked_hours || lwData.weekly_scheduled_hours || lwData.weekly_hours || 0;
+    const lwReason = lwData.reason || '';
+
+    const lwCriteria = {
+      is_worker: {
+        status: 'pass' as const,
+        label: '근로자 요건',
+        detail: '충족'
+      },
+      weekly_hours: {
+        status: lwWeeklyHours >= threshold ? 'pass' as const : 'fail' as const,
+        label: `주 ${threshold}시간 이상 근무`,
+        detail: lwWeeklyHours >= threshold ? '충족' : `미충족 (현재 ${lwWeeklyHours.toFixed(1)}시간)`
+      },
+      attendance: {
+        status: (lwReason === 'absent' || lwReason === 'not_perfect_attendance') ? 'fail' as const : 
+                lwReason === 'no_schedule' ? 'unknown' as const : 'pass' as const,
+        label: '개근',
+        detail: lwReason === 'absent' ? `결근 발생` :
+                lwReason === 'not_perfect_attendance' ? '결근 발생' :
+                lwReason === 'no_schedule' ? '판단 불가' :
+                lwEligible ? '충족' : '확인 필요'
+      }
+    };
+    
+    lastWeekHolidayPayData.value = {
+      eligible: lwEligible,
+      amount: lwData.amount || 0,
+      weekly_hours: lwWeeklyHours,
+      threshold: lwData.policy_threshold || 15,
+      reason: lwReason,
+      week_start: lwData.week_start || '',
+      week_end: lwData.week_end || '',
+      criteria: lwCriteria
     };
 
     // 퇴직금 정보 조회

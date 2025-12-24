@@ -99,11 +99,28 @@
 
       <!-- 업적 레벨 뱃지 -->
       <div class="mt-4 pt-4 border-t border-blue-200">
-        <div class="flex items-center justify-center gap-2">
+        <div class="flex items-center justify-center gap-2 mb-2">
           <span class="text-lg">{{ achievementBadge.icon }}</span>
           <span class="text-sm font-semibold" :class="achievementBadge.color">
             {{ achievementBadge.level }}
           </span>
+        </div>
+        
+        <!-- 다음 등급까지 남은 시간 -->
+        <div v-if="nextLevelInfo.hasNext" class="mt-3">
+          <div class="flex items-center justify-between text-xs text-gray-600 mb-1">
+            <span>{{ nextLevelInfo.nextLevel }}</span>
+            <span class="font-semibold text-blue-600">{{ nextLevelInfo.remaining }}시간 남음</span>
+          </div>
+          <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+            <div 
+              class="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-500"
+              :style="{ width: nextLevelInfo.progress + '%' }"
+            ></div>
+          </div>
+        </div>
+        <div v-else class="mt-2 text-center">
+          <p class="text-xs text-yellow-600 font-semibold">🎉 최고 등급 달성!</p>
         </div>
       </div>
     </div>
@@ -159,6 +176,46 @@ const achievementBadge = computed(() => {
     return { level: '초보 알바생', icon: '🐣', color: 'text-gray-600' };
   }
 });
+
+// 다음 등급까지 남은 정보 계산
+const nextLevelInfo = computed(() => {
+  const hours = totalHours.value;
+  
+  const levels = [
+    { threshold: 0, name: '초보 알바생' },
+    { threshold: 50, name: '중급 알바생' },
+    { threshold: 150, name: '숙련 알바생' },
+    { threshold: 300, name: '베테랑 알바생' },
+    { threshold: 500, name: '전설의 알바생' }
+  ];
+  
+  // 현재 레벨 찾기
+  let currentLevelIndex = 0;
+  for (let i = levels.length - 1; i >= 0; i--) {
+    if (hours >= levels[i].threshold) {
+      currentLevelIndex = i;
+      break;
+    }
+  }
+  
+  // 다음 레벨이 있는지 확인
+  if (currentLevelIndex >= levels.length - 1) {
+    return { hasNext: false, nextLevel: '', remaining: 0, progress: 100 };
+  }
+  
+  const currentLevel = levels[currentLevelIndex];
+  const nextLevel = levels[currentLevelIndex + 1];
+  const remaining = nextLevel.threshold - hours;
+  const progress = ((hours - currentLevel.threshold) / (nextLevel.threshold - currentLevel.threshold)) * 100;
+  
+  return {
+    hasNext: true,
+    nextLevel: `다음 등급: ${nextLevel.name}`,
+    remaining: remaining.toFixed(1),
+    progress: Math.min(100, Math.max(0, progress))
+  };
+});
+
 
 // 근로정보 입력 페이지로 이동
 function navigateToJobCreate() {

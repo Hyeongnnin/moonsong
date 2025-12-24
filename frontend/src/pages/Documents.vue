@@ -10,9 +10,6 @@
         <button @click="tab = 'generated'" :class="tabClass(tab === 'generated')">
           나의 서류함
         </button>
-        <button @click="tab = 'templates'" :class="tabClass(tab === 'templates')">
-          템플릿
-        </button>
       </div>
 
       <!-- 탭 컨텐츠 -->
@@ -21,9 +18,6 @@
       </div>
       <div v-else-if="tab === 'generated'">
         <GeneratedDocuments ref="docsRef" />
-      </div>
-      <div v-else>
-        <DocumentsTemplates />
       </div>
     </div>
 
@@ -41,9 +35,8 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import ResumeFormCard from '../components/ResumeFormCard.vue'
 import ResumePreviewModal from '../components/ResumePreviewModal.vue'
 import GeneratedDocuments from '../components/GeneratedDocuments.vue'
-import DocumentsTemplates from '../components/DocumentsTemplates.vue'
 
-const tab = ref<'resume' | 'generated' | 'templates'>('resume')
+const tab = ref<'resume' | 'generated'>('resume')
 const showPreview = ref(false)
 const previewData = ref<any>(null)
 const docsRef = ref<InstanceType<typeof GeneratedDocuments> | null>(null)

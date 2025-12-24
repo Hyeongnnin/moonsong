@@ -1,8 +1,19 @@
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-gray-50 pt-16">
+  <div class="min-h-screen flex items-center justify-center bg-gray-50 pt-20">
+
+
+
     <div class="w-full max-w-md px-4">
       <div class="bg-white shadow-lg rounded-2xl border border-gray-100 p-8">
+        <div class="flex justify-center mb-6">
+          <img src="@/assets/logo.png" alt="Notav" class="h-20 w-auto mb-2" />
+
+
+
+
+        </div>
         <h2 class="text-2xl font-semibold text-gray-900 mb-2">로그인</h2>
+
         <p class="text-sm text-gray-500 mb-6">
           가입하신 아이디와 비밀번호를 입력해주세요.
         </p>
@@ -41,9 +52,9 @@
               />
               <span>아이디 저장</span>
             </label>
-            <button type="button" class="hover:underline">
+            <router-link to="/find-account" class="hover:underline">
               아이디 / 비밀번호 찾기
-            </button>
+            </router-link>
           </div>
 
           <button

@@ -753,6 +753,9 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         # 여기서는 단순함을 위해 각 기록의 날짜에 대해 체크하거나 월 단위로 묶어서 처리합니다.
         # 누적 통계는 기록이 많을 수 있으므로 최적화가 필요할 수 있습니다.
         
+        hourly_rate = job.hourly_rate or Decimal('0.0')
+        is_over_5 = job.is_workplace_over_5
+
         # 기록들의 연/월 범위를 구함
         if work_records.exists():
             dates = work_records.values_list('work_date', flat=True)
@@ -770,9 +773,6 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                     curr_m = 1
                 else:
                     curr_m += 1
-
-            hourly_rate = job.hourly_rate or Decimal('0.0')
-            is_over_5 = job.is_workplace_over_5
 
             for record in work_records:
                 hours = record.get_total_hours()
@@ -834,6 +834,67 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                 elif attendance_status == 'SICK_LEAVE':
                     sick_leave_days += 1
 
+        # Future Scheduled Work (Remainder of Current Month)
+        # 사용자 요청: 현재 월의 남은 기간에 대한 예정된 근무도 누적 통계에 포함
+        from calendar import monthrange
+        if True: #Indent block preservation trick for readability if needed, but here we just dedent
+            _, last_day_of_month = monthrange(today.year, today.month)
+            month_end = date(today.year, today.month, last_day_of_month)
+            
+            curr_future = today + timedelta(days=1)
+            while curr_future <= month_end:
+                # 미래에 이미 WorkRecord가 존재할 수도 있음 (예: 미리 휴가 신청)
+                # 이 경우 위 루프에서 처리되지 않았으므로(lte=today 필터 때문), 여기서 확인 필요
+                # 하지만 get_cumulative_stats_data는 원래 '실적' 위주였음.
+                # 편의상 미래의 WorkRecord는 아직 없다고 가정하거나, 있어도 스케줄대로 계산
+                # (정확히 하려면 WorkRecord 조회 조건을 전체로 넓히고 loop에서 today 기준으로 분기하는게 낫지만,
+                #  기존 로직 최소 침습을 위해 별도 루프로 처리)
+                
+                # 해당 날짜의 WorkRecord 확인
+                future_record = WorkRecord.objects.filter(employee=job, work_date=curr_future).first()
+                f_hours = 0.0
+                f_pay = Decimal('0')
+                is_f_worked = False
+                
+                if future_record:
+                    # 기록이 있으면 기록 우선 (단, 결근 등 제외)
+                    if future_record.attendance_status in ['REGULAR_WORK', 'EXTRA_WORK', 'ANNUAL_LEAVE']:
+                        is_f_worked = True # 연차도 근무일수에는 포함 안하지만 급여는 줌? 위 로직엔 연차 급여 없음. 
+                        # 위 로직(808)에 따르면 day_pay = hours * hourly_rate.
+                        # 연차여도 시간 있으면 돈 줌.
+                        if future_record.get_total_hours() > 0:
+                            f_hours = float(future_record.get_total_hours())
+                else:
+                    # 기록 없으면 스케줄 확인
+                    if job.is_scheduled_workday(curr_future):
+                        s_info = job.get_schedule_for_date(curr_future)
+                        if s_info['is_scheduled']:
+                             dummy_date = date(2000, 1, 1)
+                             if s_info['start_time'] and s_info['end_time']:
+                                dt_start = datetime.combine(dummy_date, s_info['start_time'])
+                                dt_end = datetime.combine(dummy_date, s_info['end_time'])
+                                if dt_end < dt_start:
+                                    dt_end += timedelta(days=1)
+                                dur = (dt_end - dt_start).total_seconds() / 60.0 + float(s_info.get('next_day_work_minutes', 0))
+                                brk = float(s_info.get('break_minutes', 0))
+                                f_hours = max(0.0, (dur - brk) / 60.0)
+                                is_f_worked = True
+                
+                if f_hours > 0:
+                    total_hours += Decimal(str(f_hours))
+                    # 수당 계산 (야간/휴일 등은 복잡하니 기본급만 추정하거나, 위와 동일 로직 적용)
+                    # 여기선 일단 기본급만 적용 (단순화)
+                    f_pay = Decimal(str(f_hours)) * hourly_rate
+                    total_earnings += f_pay
+                    
+                    if is_f_worked:
+                        total_work_days += 1
+                        # 미래는 일단 'REGULAR_WORK'로 간주하여 카운트
+                        regular_work_days += 1
+                        regular_work_hours += Decimal(str(f_hours))
+                
+                curr_future += timedelta(days=1)
+
             total_earnings = total_earnings.quantize(Decimal('1')) # 원 단위 절사
             regular_work_earnings = regular_work_hours * hourly_rate
             extra_work_earnings = extra_work_hours * hourly_rate
@@ -869,12 +930,38 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                     total_confirmed_holiday_pay += h_res['amount']
                 curr_week_start += timedelta(days=7)
 
+        # 공제 계산 (누적 업적용)
+        import math
+        gross_pay = float(total_earnings) + total_confirmed_holiday_pay
+        total_deduction = 0
+
+        if job.deduction_type == 'FOUR_INSURANCE':
+            # 국민연금 4.5%
+            pension = math.floor((gross_pay * 0.045) / 10) * 10
+            # 건강보험 3.545%
+            health = math.floor((gross_pay * 0.03545) / 10) * 10
+            # 장기요양보험 (건강보험의 12.95%)
+            care = math.floor((health * 0.1295) / 10) * 10
+            # 고용보험 0.9%
+            employment = math.floor((gross_pay * 0.009) / 10) * 10
+            
+            total_deduction = pension + health + care + employment
+            
+        elif job.deduction_type == 'FREELANCE':
+            # 3.3%
+            tax = math.floor((gross_pay * 0.033) / 10) * 10
+            total_deduction = tax
+        
+        achievement_total = gross_pay - total_deduction
+
         return {
             'total_hours': float(total_hours),
             'total_earnings': float(total_earnings), # 순수 근로 기준
             'total_work_days': total_work_days,
             'total_confirmed_holiday_pay': total_confirmed_holiday_pay,
-            'achievement_total': float(total_earnings) + total_confirmed_holiday_pay,
+            'achievement_total': achievement_total, # 세후 (공제 반영)
+            'total_gross_pay': gross_pay, # 세전
+            'total_deduction': total_deduction, # 공제액
             'start_date': earliest.isoformat() if earliest else None,
             'record_ids': record_ids,
             'records_debug': records_debug,
@@ -1340,9 +1427,10 @@ class WorkRecordViewSet(viewsets.ModelViewSet):
                 from datetime import datetime
                 work_date = datetime.strptime(work_date_str, '%Y-%m-%d').date()
                 today = timezone.localdate()
-                if work_date > today:
-                    from rest_framework.exceptions import ValidationError
-                    raise ValidationError("미래 날짜에는 근로 기록을 입력할 수 없습니다.")
+                # 미래 날짜 입력 차단 로직 제거 (2025-12-23: 출결 상태 변경 허용을 위해 제거)
+                # if work_date > today:
+                #     from rest_framework.exceptions import ValidationError
+                #     raise ValidationError("미래 날짜에는 근로 기록을 입력할 수 없습니다.")
                 
                 # attendance_status가 없으면 소정근로일 여부에 따라 자동 설정
                 if 'attendance_status' not in self.request.data or not self.request.data.get('attendance_status'):
@@ -1389,9 +1477,10 @@ class WorkRecordViewSet(viewsets.ModelViewSet):
             from datetime import datetime
             work_date = datetime.strptime(work_date_str, '%Y-%m-%d').date()
             today = timezone.localdate()
-            if work_date > today:
-                from rest_framework.exceptions import ValidationError
-                raise ValidationError("미래 날짜의 근로 기록은 수정할 수 없습니다.")
+            # 미래 날짜 수정 차단 로직 제거 (2025-12-23: 출결 상태 변경 허용을 위해 제거)
+            # if work_date > today:
+            #     from rest_framework.exceptions import ValidationError
+            #     raise ValidationError("미래 날짜의 근로 기록은 수정할 수 없습니다.")
         
         serializer.save()
 
