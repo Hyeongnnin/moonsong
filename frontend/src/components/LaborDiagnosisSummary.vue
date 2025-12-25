@@ -197,10 +197,18 @@ const fetchDiagnosisData = async () => {
     const today = new Date();
     const lastWeekDate = new Date(today);
     lastWeekDate.setDate(today.getDate() - 7);
-    const lastWeekDateStr = lastWeekDate.toISOString().split('T')[0];
+    
+    // 로컬 타임존 기준 날짜 문자열 생성 (YYYY-MM-DD)
+    const year = lastWeekDate.getFullYear();
+    const month = String(lastWeekDate.getMonth() + 1).padStart(2, '0');
+    const day = String(lastWeekDate.getDate()).padStart(2, '0');
+    const lastWeekDateStr = `${year}-${month}-${day}`;
     
     const lastWeekHolidayPayRes = await apiClient.get(`/labor/employees/${props.activeJob.id}/holiday-pay/`, {
-      params: { date: lastWeekDateStr }
+      params: { 
+        date: lastWeekDateStr,
+        _t: Date.now() // 캐시 방지
+      }
     });
     const lastWeekHolidayPayData = lastWeekHolidayPayRes.data;
 

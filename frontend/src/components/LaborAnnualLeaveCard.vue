@@ -47,7 +47,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useJob } from '../stores/jobStore'
 import { useLabor, type AnnualLeaveResult } from '../composables/useLabor'
 
@@ -78,8 +78,12 @@ watch(() => activeJob.value?.id, () => load())
 onMounted(() => {
   load()
   window.addEventListener('job-updated', load)
-  // labor-updated 이벤트도 처리 (연차 사용 등록 시 갱신)
   window.addEventListener('labor-updated', load)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('job-updated', load)
+  window.removeEventListener('labor-updated', load)
 })
 </script>
 

@@ -17,6 +17,11 @@
         <div class="flex items-center gap-3 mb-2">
           <div class="w-20 text-sm font-medium">{{ d.label }}</div>
           
+          <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
+            <input type="checkbox" v-model="localSchedules[d.value].enabled" class="rounded border-gray-300 text-brand-600 focus:ring-brand-500" /> 
+            <span :class="localSchedules[d.value].enabled ? 'text-gray-900' : 'text-gray-400'">일하는 날</span>
+          </label>
+
           <!-- 시작 시간 Select -->
           <TimeSelect
             v-model="localSchedules[d.value].start_time" 
@@ -47,11 +52,6 @@
             />
             <span class="text-xs text-gray-500">분</span>
           </div>
-          
-          <label class="ml-2 inline-flex items-center gap-2 text-sm cursor-pointer select-none">
-            <input type="checkbox" v-model="localSchedules[d.value].enabled" class="rounded border-gray-300 text-brand-600 focus:ring-brand-500" /> 
-            <span :class="localSchedules[d.value].enabled ? 'text-gray-900' : 'text-gray-400'">일하는 날</span>
-          </label>
         </div>
         
         <!-- 익일 근무 입력 섹션 -->

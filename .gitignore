@@ -1,0 +1,35 @@
+# General
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Python / Django
+*.pyc
+*.pyo
+__pycache__/
+*.log
+db.sqlite3
+.env
+venv/
+env/
+.venv/
+
+# Media (User Uploads)
+media/
+!media/.gitkeep
+
+# Frontend (Vue/Node)
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+
+# IDEs
+.vscode/
+.idea/

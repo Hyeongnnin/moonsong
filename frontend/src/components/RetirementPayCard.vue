@@ -43,10 +43,7 @@
 
         <!-- 상세 정보 -->
         <div class="space-y-1.5 text-sm">
-          <div class="flex justify-between text-gray-600">
-            <span>평균임금 (일급)</span>
-            <span class="font-medium">{{ formatCurrency(data.average_wage) }}원</span>
-          </div>
+
           <div class="flex justify-between text-gray-600">
             <span>재직기간</span>
             <span class="font-medium">{{ data.service_months }}개월 ({{ data.service_days }}일)</span>

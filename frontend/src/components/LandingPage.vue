@@ -1,470 +1,127 @@
 <template>
-  <div class="min-h-screen bg-white">
-    <!-- Hero Section -->
-    <section class="pt-24 pb-16 bg-gradient-to-b from-brand-50 to-white">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="grid md:grid-cols-2 gap-12 items-center">
-          <div>
-            <div class="inline-flex items-center px-3 py-1 bg-brand-100 text-brand-700 rounded-full text-sm mb-4">
-              <span class="w-2 h-2 rounded-full bg-brand-500 mr-2" />
-              청년·알바생을 위한 노동법률 진단 서비스
-            </div>
-            
-            <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold mb-6 tracking-tight text-gray-900 leading-tight">
-              <span class="block">내 근로 계약,</span>
-              <span class="block text-brand-600">법적으로 안전할까?</span>
-            </h1>
-            
-            <p class="text-lg text-gray-600 mb-6 leading-relaxed">
-              근로계약서의 내용을 AI가 분석하고, 노동법률 전문가가 검토하여
-              <span class="font-semibold"> 임금, 근로시간, 휴게, 주휴수당</span> 등 필수 항목을 진단해 드립니다.
-            </p>
-            
-            <div class="flex flex-col sm:flex-row gap-4 mb-8">
-              <button 
-                class="px-8 py-3 text-base font-semibold bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors flex items-center justify-center"
-                @click="router.push('/dashboard')"
-              >
-                지금 진단 시작하기
-                <span class="ml-2">→</span>
-              </button>
-              
-              <button 
-                class="px-8 py-3 text-base font-semibold border-2 border-gray-300 text-gray-800 rounded-lg hover:bg-gray-50 transition-colors"
-                @click="router.push('/signup')"
-              >
-                회원가입하고 더 안전하게
-              </button>
-            </div>
-            
-            <div class="flex flex-wrap items-center gap-6 text-sm text-gray-500">
-              <div class="flex items-center gap-2">
-                <svg class="w-4 h-4 text-brand-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 15a5 5 0 100-10 5 5 0 000 10zm0-2a3 3 0 100-6 3 3 0 000 6z"/></svg>
-                <span>노동법률 전문가 검토</span>
-              </div>
-              <div class="flex items-center gap-2">
-                <svg class="w-4 h-4 text-brand-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.5H7a1 1 0 100 2h4a1 1 0 001-1V7z"/></svg>
-                <span>5분 내 간편 진단</span>
-              </div>
-              <div class="flex items-center gap-2">
-                <svg class="w-4 h-4 text-brand-500" fill="currentColor" viewBox="0 0 20 20"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
-                <span>모바일에서도 간편하게</span>
-              </div>
-            </div>
+  <div class="h-[calc(100vh-80px)] w-full overflow-hidden bg-black relative">
+    <!-- Video Background -->
+    <div class="absolute inset-0 w-full h-full">
+      <video 
+        autoplay 
+        muted 
+        loop 
+        playsinline 
+        class="w-full h-full object-cover"
+      >
+        <source src="@/assets/landingbg.mp4" type="video/mp4" />
+        <div class="absolute inset-0 bg-gray-900" />
+      </video>
+      <!-- Overlay -->
+      <div class="absolute inset-0 bg-black/60 z-10"></div>
+    </div>
+
+    <!-- Content Overlay -->
+    <div class="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full h-full flex items-center">
+      <div class="grid md:grid-cols-2 gap-12 items-center w-full">
+        <!-- Left Text -->
+        <div class="text-white">
+          <div class="inline-flex items-center px-3 py-1 bg-white/10 backdrop-blur-sm border border-white/20 text-white rounded-full text-sm mb-6">
+            <span class="w-2 h-2 rounded-full bg-green-400 mr-2 animate-pulse" />
+            알바생을 위한 근로 관리 필수 앱
           </div>
           
-          <div class="relative">
-            <div class="absolute -top-8 -left-8 w-40 h-40 bg-brand-100 rounded-full blur-3xl opacity-60" />
-            <div class="absolute -bottom-12 -right-8 w-40 h-40 bg-brand-200 rounded-full blur-3xl opacity-60" />
-            
-            <div class="relative bg-white rounded-3xl shadow-2xl p-6 border border-gray-100">
-              <div class="flex items-center justify-between mb-4">
-                <div>
-                  <h3 class="text-lg font-semibold text-gray-900">알바 근로계약서 진단</h3>
-                  <p class="text-sm text-gray-500">OO카페 / 파트타임 / 시급제</p>
-                </div>
-                <span class="inline-flex items-center px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-medium">
-                  진단 진행 중
-                </span>
-              </div>
-
-              <div class="space-y-3 mb-4">
-                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                  <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center">
-                      <span class="text-brand-600 text-sm font-semibold">임금</span>
-                    </div>
-                    <div>
-                      <p class="text-sm font-medium text-gray-900">시급 및 주휴수당</p>
-                      <p class="text-xs text-gray-500">최저임금 및 주휴수당 포함 여부</p>
-                    </div>
-                  </div>
-                  <span class="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700 font-medium">
-                    양호
-                  </span>
-                </div>
-
-                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                  <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center">
-                      <span class="text-brand-600 text-sm font-semibold">시간</span>
-                    </div>
-                    <div>
-                      <p class="text-sm font-medium text-gray-900">근로시간 및 휴게시간</p>
-                      <p class="text-xs text-gray-500">법정 근로시간·휴게시간 준수 여부</p>
-                    </div>
-                  </div>
-                  <span class="text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-700 font-medium">
-                    확인 필요
-                  </span>
-                </div>
-
-                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                  <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center">
-                      <span class="text-brand-600 text-sm font-semibold">계약</span>
-                    </div>
-                    <div>
-                      <p class="text-sm font-medium text-gray-900">계약 기간 및 갱신</p>
-                      <p class="text-xs text-gray-500">계약 갱신·해지 조건의 명확성</p>
-                    </div>
-                  </div>
-                  <span class="text-xs px-2 py-1 rounded-full bg-red-100 text-red-700 font-medium">
-                    위험
-                  </span>
-                </div>
-              </div>
-
-              <div class="p-3 bg-brand-50 rounded-xl flex items-start gap-3 mb-4">
-                <div class="mt-1">
-                  <svg class="w-4 h-4 text-brand-600" fill="currentColor" viewBox="0 0 20 20"><path d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z"/></svg>
-                </div>
-                <div>
-                  <p class="text-xs font-medium text-brand-900 mb-1">노무사 코멘트 요약</p>
-                  <p class="text-xs text-brand-800">
-                    주휴수당 산정 방식에 일부 문제가 있어 보이며, 근로계약서 상 계약 종료 사유가 모호하게 기재되어 있습니다.
-                    필요시 상담을 통해 구체적인 조언을 받아보세요.
-                  </p>
-                </div>
-              </div>
-
-              <div class="flex flex-col sm:flex-row gap-3">
-                <button class="flex-1 px-4 py-2 text-sm font-semibold bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors">
-                  상세 진단 결과 보기
-                </button>
-                <button 
-                  class="flex-1 px-4 py-2 text-sm font-semibold border border-gray-300 text-gray-800 rounded-lg hover:bg-gray-50 transition-colors"
-                  @click="router.push('/login')"
-                >
-                  전문가 상담 신청
-                </button>
-              </div>
-            </div>
-
-            <div class="mt-6 text-xs text-gray-500 text-center">
-              실제 화면과 다를 수 있으며, 예시 화면입니다.
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Features Section -->
-    <section id="features" class="py-20 bg-white">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="text-center mb-12">
-          <h2 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
-            이렇게 진단해 드려요
-          </h2>
-          <p class="text-gray-500 max-w-2xl mx-auto">
-            근로계약서의 핵심 항목을 기준으로, 임금·근로시간·휴게·주휴수당·해고 등
-            주요 노동법 이슈를 AI와 전문가가 함께 검토합니다.
+          <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold mb-6 tracking-tight leading-tight text-shadow-lg">
+            <span class="block">내 알바 급여와 권리,</span>
+            <span class="block text-brand-300">한 번에 관리하세요</span>
+          </h1>
+          
+          <p class="text-lg text-gray-200 mb-8 leading-relaxed max-w-lg">
+            일한 시간만 입력하면 <span class="font-semibold text-white">급여와 수당을 자동 계산</span>하고,<br class="hidden sm:block" />
+            궁금한 건 AI에게 물어보고, 서류와 이력까지 깔끔하게 정리해요.
           </p>
-        </div>
-
-        <div class="grid md:grid-cols-3 gap-8">
-          <div class="p-6 border border-gray-100 shadow-sm rounded-lg bg-white">
-            <div class="w-10 h-10 rounded-full bg-brand-50 flex items-center justify-center mb-4">
-              <span class="text-brand-600 font-semibold">01</span>
-            </div>
-            <h3 class="text-lg font-semibold mb-2">근로계약서 업로드</h3>
-            <p class="text-sm text-gray-500 mb-4">
-              사진이나 파일로 근로계약서를 업로드하면, AI가 내용을 자동으로 인식합니다.
-            </p>
-            <ul class="space-y-1 text-sm text-gray-500">
-              <li class="flex items-center gap-2">
-                <svg class="w-4 h-4 text-brand-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                이미지·PDF·문서 파일 지원
-              </li>
-              <li class="flex items-center gap-2">
-                <svg class="w-4 h-4 text-brand-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                개인정보는 안전하게 암호화
-              </li>
-            </ul>
+          
+          <div class="flex flex-col sm:flex-row gap-4 mb-10">
+            <button 
+              class="w-full max-w-lg px-8 py-4 text-lg font-bold bg-brand-600 text-white rounded-xl hover:bg-brand-500 transition-all transform hover:scale-105 shadow-lg shadow-brand-900/50 flex items-center justify-center"
+              @click="router.push('/dashboard')"
+            >
+              내 알바 관리 시작하기
+              <svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+            </button>
           </div>
-
-          <div class="p-6 border border-gray-100 shadow-sm rounded-lg bg-white">
-            <div class="w-10 h-10 rounded-full bg-brand-50 flex items-center justify-center mb-4">
-              <span class="text-brand-600 font-semibold">02</span>
+          
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-6 text-sm text-gray-300 border-t border-white/10 pt-6">
+            <div class="flex items-center gap-2">
+              <svg class="w-5 h-5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              <span>급여·수당 자동 계산</span>
             </div>
-            <h3 class="text-lg font-semibold mb-2">AI 노동법률 진단</h3>
-            <p class="text-sm text-gray-500 mb-4">
-              업로드된 계약서를 바탕으로 임금, 근로시간, 휴게시간, 휴일, 수당 등
-              필수 항목을 점검합니다.
-            </p>
-            <ul class="space-y-1 text-sm text-gray-500">
-              <li class="flex items-center gap-2">
-                <svg class="w-4 h-4 text-brand-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                위험·주의·양호 항목 한눈에 확인
-              </li>
-              <li class="flex items-center gap-2">
-                <svg class="w-4 h-4 text-brand-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                문제가 될 수 있는 조항 자동 표시
-              </li>
-            </ul>
-          </div>
-
-          <div class="p-6 border border-gray-100 shadow-sm rounded-lg bg-white">
-            <div class="w-10 h-10 rounded-full bg-brand-50 flex items-center justify-center mb-4">
-              <span class="text-brand-600 font-semibold">03</span>
+            <div class="flex items-center gap-2">
+              <svg class="w-5 h-5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
+              <span>AI 근로 상담</span>
             </div>
-            <h3 class="text-lg font-semibold mb-2">전문가 상담 연계</h3>
-            <p class="text-sm text-gray-500 mb-4">
-              필요시 공인 노무사와의 1:1 온라인 상담으로 구체적인 대응 방안을 안내받을 수 있습니다.
-            </p>
-            <ul class="space-y-1 text-sm text-gray-500">
-              <li class="flex items-center gap-2">
-                <svg class="w-4 h-4 text-brand-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                플랫폼 내 안전한 상담 시스템
-              </li>
-              <li class="flex items-center gap-2">
-                <svg class="w-4 h-4 text-brand-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                상담 이력 및 진단 결과 저장
-              </li>
-            </ul>
+            <div class="flex items-center gap-2">
+              <svg class="w-5 h-5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+              <span>근로서류 & 이력서</span>
+            </div>
           </div>
         </div>
-      </div>
-    </section>
+        
+        <!-- Right Card (Floating) -->
+        <div class="relative hidden md:block">
+           <div class="absolute -top-10 -right-10 w-64 h-64 bg-brand-500 rounded-full blur-[100px] opacity-30 mix-blend-screen animate-pulse" />
+          
+           <!-- Stacked Cards Container -->
+           <div class="relative space-y-4">
+             
+             <!-- Card 1: Pay Summary -->
+             <div class="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl p-5 border border-white/50 transform translate-x-4 hover:translate-x-0 transition-transform duration-500">
+               <div class="flex justify-between items-center mb-3">
+                 <div class="flex items-center gap-3">
+                   <div class="w-10 h-10 rounded-full bg-brand-100 flex items-center justify-center text-xl">💰</div>
+                   <div>
+                     <p class="text-xs text-brand-600 font-bold">12월 급여 요약</p>
+                     <p class="text-sm font-bold text-gray-900">스타벅스 강남점</p>
+                   </div>
+                 </div>
+                 <span class="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-lg">주휴수당 O</span>
+               </div>
+               <div class="flex justify-between items-end border-t border-gray-100 pt-3">
+                 <span class="text-xs text-gray-500">예상 입금액</span>
+                 <span class="text-lg font-bold text-gray-900">1,280,300원</span>
+               </div>
+             </div>
 
-    <!-- Target Users Section -->
-    <section class="py-20 bg-brand-50/50">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="grid md:grid-cols-2 gap-10 items-center">
-          <div>
-            <h2 class="text-3xl font-bold text-gray-900 mb-4">
-              이런 분들이 주로 이용해요
-            </h2>
-            <p class="text-gray-600 mb-6">
-              특히 첫 알바, 첫 직장 생활을 준비하는 청년·알바생 여러분께
-              <span class="font-semibold"> 필수적인 서비스</span>입니다.
-            </p>
-            
-            <div class="space-y-4">
-              <div class="flex gap-3">
-                <div class="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center mt-1 flex-shrink-0">
-                  <span class="text-brand-600 text-sm font-semibold">A</span>
-                </div>
-                <div>
-                  <p class="text-sm font-semibold text-gray-900">
-                    첫 아르바이트를 시작하는 고3·대학생
-                  </p>
-                  <p class="text-sm text-gray-500">
-                    근로계약서를 처음 받아보는 분들, 무엇을 확인해야 할지 막막한 분들
-                  </p>
-                </div>
-              </div>
+             <!-- Card 2: AI Tech -->
+             <div class="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl p-5 border border-white/50 -translate-x-2 hover:translate-x-0 transition-transform duration-500 z-10">
+               <div class="flex items-start gap-3">
+                 <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-lg flex-shrink-0">🤖</div>
+                 <div class="space-y-2 w-full">
+                   <div class="bg-gray-100 rounded-lg rounded-tl-none p-2.5 text-xs text-gray-600">
+                     "사장님이 30분 일찍 오라고 하는데, 이거 근무시간인가요?"
+                   </div>
+                   <div class="bg-brand-50 rounded-lg rounded-tr-none p-2.5 text-xs text-brand-800 font-medium">
+                     네, 사용자의 지휘·감독 하에 있는 대기시간은 근로시간에 포함됩니다.
+                   </div>
+                 </div>
+               </div>
+             </div>
 
-              <div class="flex gap-3">
-                <div class="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center mt-1 flex-shrink-0">
-                  <span class="text-brand-600 text-sm font-semibold">B</span>
-                </div>
-                <div>
-                  <p class="text-sm font-semibold text-gray-900">
-                    계약 변경·연장을 앞둔 알바생
-                  </p>
-                  <p class="text-sm text-gray-500">
-                    시급 조정, 근로시간 변경, 계약 연장 등 조건 변경이 고민되는 분들
-                  </p>
-                </div>
-              </div>
+             <!-- Card 3: Resume/Docs -->
+             <div class="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl p-5 border border-white/50 transform translate-x-2 hover:translate-x-0 transition-transform duration-500">
+               <div class="flex items-center justify-between mb-2">
+                 <div class="flex items-center gap-2">
+                    <span class="text-lg">📄</span>
+                    <span class="text-sm font-bold text-gray-900">알바 이력서 생성</span>
+                 </div>
+                 <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+               </div>
+               <div class="flex gap-2 mt-2">
+                 <span class="text-[10px] bg-gray-100 px-2 py-1 rounded text-gray-500">#편의점 6개월</span>
+                 <span class="text-[10px] bg-gray-100 px-2 py-1 rounded text-gray-500">#성실함</span>
+                 <span class="text-[10px] bg-gray-100 px-2 py-1 rounded text-gray-500">#포스기능통</span>
+               </div>
+             </div>
 
-              <div class="flex gap-3">
-                <div class="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center mt-1 flex-shrink-0">
-                  <span class="text-brand-600 text-sm font-semibold">C</span>
-                </div>
-                <div>
-                  <p class="text-sm font-semibold text-gray-900">
-                    카페·음식점·편의점 등 서비스 업종 종사자
-                  </p>
-                  <p class="text-sm text-gray-500">
-                    주휴수당, 야간수당 등 수당 관련 문제가 걱정되는 분들
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="rounded-2xl overflow-hidden shadow-2xl bg-gray-200 h-96">
-            <div class="w-full h-full flex items-center justify-center text-gray-500">
-              [이미지 영역]
-            </div>
-          </div>
+           </div>
         </div>
       </div>
-    </section>
-
-    <!-- FAQ Section -->
-    <section class="py-16 bg-white" id="service">
-      <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="text-center mb-10">
-          <h2 class="text-3xl font-bold text-gray-900 mb-3">
-            자주 묻는 질문
-          </h2>
-          <p class="text-gray-500 text-sm">
-            알바생·청년들이 가장 많이 궁금해하는 내용을 모았어요.
-          </p>
-        </div>
-
-        <div class="space-y-4">
-          <div class="p-4 sm:p-5 border border-gray-100 rounded-lg bg-white">
-            <div class="flex gap-3">
-              <div class="mt-1 flex-shrink-0">
-                <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-brand-50 text-brand-600 text-xs font-semibold">
-                  Q
-                </span>
-              </div>
-              <div>
-                <p class="text-sm font-semibold text-gray-900 mb-1">
-                  근로계약서를 쓰지 않았는데, 진단이 가능한가요?
-                </p>
-                <p class="text-sm text-gray-500">
-                  네. 근로계약서를 작성하지 않은 경우에도, 현재 일하고 있는 조건(시급, 근무 시간, 휴게시간 등)을 
-                  간단히 입력하면 기본적인 노동법 위반 여부를 확인할 수 있습니다.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div class="p-4 sm:p-5 border border-gray-100 rounded-lg bg-white">
-            <div class="flex gap-3">
-              <div class="mt-1 flex-shrink-0">
-                <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-brand-50 text-brand-600 text-xs font-semibold">
-                  Q
-                </span>
-              </div>
-              <div>
-                <p class="text-sm font-semibold text-gray-900 mb-1">
-                  진단 결과에 문제가 있다고 나오면, 바로 신고해야 하나요?
-                </p>
-                <p class="text-sm text-gray-500">
-                  꼭 그렇지는 않습니다. 먼저 사업장과의 대화를 시도해 볼 수 있으며, 
-                  필요시 공인 노무사와의 상담을 통해 대응 방법을 안내받을 수 있습니다.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div class="p-4 sm:p-5 border border-gray-100 rounded-lg bg-white">
-            <div class="flex gap-3">
-              <div class="mt-1 flex-shrink-0">
-                <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-brand-50 text-brand-600 text-xs font-semibold">
-                  Q
-                </span>
-              </div>
-              <div>
-                <p class="text-sm font-semibold text-gray-900 mb-1">
-                  서비스 이용에 비용이 드나요?
-                </p>
-                <p class="text-sm text-gray-500">
-                  기본적인 근로계약서 진단은 무료로 제공되며, 전문가와의 1:1 상담은 별도의 비용이 발생할 수 있습니다.
-                  자세한 요금 체계는 추후 정식 오픈 시 안내될 예정입니다.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- CTA Section -->
-    <section class="py-16 bg-brand-600 text-white">
-      <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="grid md:grid-cols-2 gap-10 items-center">
-          <div>
-            <h2 class="text-3xl font-bold mb-4">
-              지금 내 근로계약서,<br />한번 점검해 볼까요?
-            </h2>
-            <p class="text-brand-100 mb-6 text-sm sm:text-base">
-              작은 의심도 괜찮아요. 
-              임금·근로시간·휴게·주휴수당·계약조건 등, 
-              혼자 고민하지 말고 노타브와 함께 확인해 보세요.
-            </p>
-            <div class="flex flex-col sm:flex-row gap-3">
-              <button 
-                class="bg-white text-brand-700 hover:bg-brand-50 font-semibold px-6 py-3 rounded-lg transition-colors"
-                @click="router.push('/dashboard')"
-              >
-                바로 진단 시작하기
-              </button>
-              <button 
-                class="border-2 border-white text-white hover:bg-brand-500 font-semibold px-6 py-3 rounded-lg transition-colors"
-                @click="router.push('/signup')"
-              >
-                회원가입하고 이용하기
-              </button>
-            </div>
-          </div>
-
-          <div class="space-y-4 text-sm text-brand-100">
-            <div class="flex gap-3">
-              <svg class="w-4 h-4 mt-1 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-              <p>AI 자동 진단과 노무사 검토를 통해 보다 정확한 진단을 제공합니다.</p>
-            </div>
-            <div class="flex gap-3">
-              <svg class="w-4 h-4 mt-1 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-              <p>근로계약서가 없어도, 현재 일하는 조건을 기준으로 기본 진단이 가능합니다.</p>
-            </div>
-            <div class="flex gap-3">
-              <svg class="w-4 h-4 mt-1 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-              <p>진단 및 상담 내용은 안전하게 보호되며, 본인 동의 없이 외부에 공유되지 않습니다.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Footer -->
-    <footer class="py-10 bg-gray-900 text-gray-400">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex flex-col md:flex-row justify-between gap-8 mb-6">
-          <div>
-            <div class="flex items-center gap-3 mb-3">
-              <img src="@/assets/logo.png" alt="노타브" class="h-16 w-auto brightness-0 invert" />
-
-              <span class="text-xl font-semibold text-white tracking-tight">노타브</span>
-              <span class="text-xs px-2 py-1 rounded-full bg-brand-600 text-white">
-                Beta
-              </span>
-            </div>
-
-            <p class="text-sm text-gray-500 max-w-md">
-              청년·알바생·직장인의 안전한 노동 환경을 위해, 근로계약서 진단과 노동법률 상담을 쉽고 간편하게 제공합니다.
-            </p>
-          </div>
-
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-6 text-sm">
-            <div>
-              <h4 class="text-white mb-4">서비스</h4>
-              <ul class="space-y-2">
-                <li><a href="#features" class="hover:text-white">근로계약서 진단</a></li>
-                <li><a href="#service" class="hover:text-white">노동법 Q&A</a></li>
-                <li><a href="#" class="hover:text-white">노무사 상담</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 class="text-white mb-4">지원</h4>
-              <ul class="space-y-2">
-                <li><a href="#" class="hover:text-white">자주 묻는 질문</a></li>
-                <li><a href="#" class="hover:text-white">공지사항</a></li>
-                <li><a href="#" class="hover:text-white">1:1 문의</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 class="text-white mb-4">정보</h4>
-              <ul class="space-y-2">
-                <li><a href="#" class="hover:text-white">회사 소개</a></li>
-                <li><a href="#" class="hover:text-white">이용약관</a></li>
-                <li><a href="#" class="hover:text-white">개인정보처리방침</a></li>
-              </ul>
-            </div>
-          </div>
-        </div>
-        <div class="border-t border-gray-800 mt-12 pt-8 text-center">
-          <p>&copy; 2025 노타브. All rights reserved.</p>
-        </div>
-      </div>
-    </footer>
+    </div>
   </div>
 </template>
 

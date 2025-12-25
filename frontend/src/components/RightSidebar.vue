@@ -82,6 +82,7 @@ onUnmounted(() => {
 })
 
 function handleLaborUpdate() {
+  console.log('Labor updated, refreshing sidebar summary...');
   if (achievementCardRef.value) {
     achievementCardRef.value.refresh()
   }

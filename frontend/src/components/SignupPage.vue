@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-gray-50 pt-20">
+  <div class="h-[calc(100vh-80px)] flex items-center justify-center bg-gray-50">
 
 
 

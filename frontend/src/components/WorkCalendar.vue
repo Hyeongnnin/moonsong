@@ -590,6 +590,7 @@ const getAttendanceStatusLabel = (dateIso?: string): string => {
   
   const statusLabels: Record<string, string> = {
     'REGULAR_WORK': '근무',
+    'EXTRA_WORK': '추가근무',
     'ANNUAL_LEAVE': '연차',
     'SICK_LEAVE': '병가',
     'ABSENT': '결근',

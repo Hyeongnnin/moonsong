@@ -55,6 +55,7 @@
         </div>
         <div class="text-right">
           <p class="text-lg font-bold text-indigo-700">{{ nightHours.toFixed(1) }}시간</p>
+          <p class="text-xs font-semibold text-indigo-500">+ {{ formatCurrency(nightBonus) }}</p>
         </div>
       </div>
 

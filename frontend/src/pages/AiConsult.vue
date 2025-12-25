@@ -1,11 +1,11 @@
 <template>
   <section class="flex flex-col h-full">
-    <h2 class="text-2xl font-semibold mb-4 px-2">AI 노무 상담</h2>
+    <h2 class="text-2xl font-semibold mb-4 px-2">AI 알바 상담</h2>
     
     <!-- Chat Area -->
     <div class="flex-1 overflow-y-auto p-4 bg-gray-50 rounded-lg border border-gray-200 mb-4 h-[500px]" ref="chatContainer">
       <div v-if="messages.length === 0" class="text-center text-gray-500 mt-20">
-        <div class="text-4xl mb-4">🤖</div>
+        <div class="text-4xl mb-4">🧑‍⚖️</div>
         <p class="text-lg font-medium text-gray-700">무엇이든 물어보세요!</p>
         <p class="text-sm mt-2 text-gray-400">
           "내 시급이 얼마야?"<br>

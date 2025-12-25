@@ -201,34 +201,37 @@ function roundToNearest30(timeStr: string | null): string | null {
 }
 
 // props.record 변경 감지 - 실제 근로기록 또는 스케줄 정보 로드
+// [Fix] 스케줄 정보 복원을 위해 항상 상세 데이터를 가져오거나, 최소한 백그라운드 스케줄 정보를 확보해야 합니다.
+const scheduledTimeIn = ref<string | null>(null)
+const scheduledTimeOut = ref<string | null>(null)
+const scheduledBreakMinutes = ref<number>(0)
+const scheduledNextDay = ref<number>(0)
+
 watch(() => props.record, async (r) => {
   console.log('[WorkDayModal] Props record changed:', r);
   
+  // 1. 초기값 설정 (UI 표시용)
   if (r && r.schedule_only) {
-    // 스케줄만 있는 경우 (실제 근로기록 없음)
+    // 스케줄만 있는 경우
     timeIn.value = roundToNearest30(r.start_time || null);
     timeOut.value = roundToNearest30(r.end_time || null);
     breakMinutes.value = r.break_minutes || 60;
     hasSchedule.value = true;
     
-    // 익일 근무 정보
     hasNextDayWork.value = (r.next_day_work_minutes || 0) > 0;
     nextDayWorkMinutes.value = r.next_day_work_minutes || 0;
     
-    // Phase 3: 소정근로일 정보
     isScheduledWorkday.value = r.is_scheduled_workday || false;
-    attendanceStatus.value = 'REGULAR_WORK';  // 스케줄 기반이면 기본값
+    attendanceStatus.value = 'REGULAR_WORK';
     
-    console.log('[WorkDayModal] 스케줄 기반 데이터 로드:', {
-      timeIn: timeIn.value,
-      timeOut: timeOut.value,
-      breakMinutes: breakMinutes.value,
-      hasNextDayWork: hasNextDayWork.value,
-      nextDayWorkMinutes: nextDayWorkMinutes.value
-    });
+    // 백업해두기
+    scheduledTimeIn.value = timeIn.value
+    scheduledTimeOut.value = timeOut.value
+    scheduledBreakMinutes.value = breakMinutes.value
+    scheduledNextDay.value = nextDayWorkMinutes.value
+    
   } else if (r && r.id) {
-    // 실제 근로기록이 있는 경우
-    // DB에는 초 단위까지 있을 수 있으므로 slice 후 반올림 적용
+    // 실제 근로기록이 있는 경우 (ABSENT 등 포함)
     const rawIn = r.time_in ? r.time_in.split('T')[1].slice(0, 5) : null;
     const rawOut = r.time_out ? r.time_out.split('T')[1].slice(0, 5) : null;
     
@@ -236,118 +239,87 @@ watch(() => props.record, async (r) => {
     timeOut.value = roundToNearest30(rawOut);
     breakMinutes.value = r.break_minutes || 0;
     
-    // 익일 근무 시간 로드
     hasNextDayWork.value = !!r.next_day_work_minutes && r.next_day_work_minutes > 0;
     nextDayWorkMinutes.value = r.next_day_work_minutes || 0;
     
-    // Phase 3: 출결 상태 (백엔드에서 attendance_status 사용)
     attendanceStatus.value = r.attendance_status || 'REGULAR_WORK';
     isScheduledWorkday.value = r.is_scheduled_workday || false;
     hasSchedule.value = false;
     
-    console.log('[WorkDayModal] 실제 근로기록 로드:', {
-      id: r.id,
-      timeIn: timeIn.value,
-      timeOut: timeOut.value,
-      breakMinutes: breakMinutes.value
-    });
-  } else {
-    // 근로기록도 스케줄도 없음 - 백엔드에서 기본 스케줄 정보 가져오기
-    console.log('[WorkDayModal] 근로기록 없음, date-schedule API 호출:', props.dateIso);
+    // [Fix] 실제 기록이 있더라도, "원래 스케줄"이 무엇이었는지 알기 위해 API 호출 필요
+    // (특히 ABSENT -> REGULAR_WORK 복구 시 자동 입력을 위해)
+    await fetchBackingSchedule()
     
-    if (props.employeeId && props.dateIso) {
-      try {
-        // redundant call 방지: 부모가 이미 props.record를 잘 넘겨줬다면 fetch 스킵
-        if (props.record && props.record.work_date === props.dateIso && !props.record.schedule_only) {
-          console.log('[WorkDayModal] Skipping redundant fetch, using props.record');
-          return;
-        }
+  } else {
+    // 근로기록도 스케줄도 없음 (Init from API)
+    await fetchBackingSchedule()
+    
+    // API 호출 결과(scheduledTimeIn 등)를 현재 값으로 적용
+    if (scheduledTimeIn.value) {
+        timeIn.value = scheduledTimeIn.value
+        timeOut.value = scheduledTimeOut.value
+        breakMinutes.value = scheduledBreakMinutes.value
+        nextDayWorkMinutes.value = scheduledNextDay.value
+        hasNextDayWork.value = scheduledNextDay.value > 0
+        hasSchedule.value = true
+        attendanceStatus.value = 'REGULAR_WORK'
+    } else {
+        // 완전 빈 상태
+        timeIn.value = null
+        timeOut.value = null
+        breakMinutes.value = 0
+        hasNextDayWork.value = false
+        attendanceStatus.value = 'EXTRA_WORK' // 스케줄 없으면 기본 추가근무
+    }
+  }
+}, { immediate: true })
 
+// Helper: 원래 스케줄 정보만 가져오기
+async function fetchBackingSchedule() {
+    if (!props.employeeId || !props.dateIso) return
+    
+    try {
         const response = await apiClient.get(
           `/labor/employees/${props.employeeId}/date-schedule/`,
           { params: { date: props.dateIso } }
         );
+        const info = response.data
         
-        const scheduleInfo = response.data;
-        console.log('[WorkDayModal] date-schedule API 응답:', scheduleInfo);
+        isScheduledWorkday.value = info.is_scheduled_workday || false
         
-        // 실제 근로기록이 API 응답에 포함되어 있다면 그것을 우선 사용
-        if (scheduleInfo.work_record) {
-          const wr = scheduleInfo.work_record;
-          const rawIn = wr.time_in ? wr.time_in.split('T')[1].slice(0, 5) : null;
-          const rawOut = wr.time_out ? wr.time_out.split('T')[1].slice(0, 5) : null;
-          
-          timeIn.value = roundToNearest30(rawIn);
-          timeOut.value = roundToNearest30(rawOut);
-          breakMinutes.value = wr.break_minutes || 0;
-          hasNextDayWork.value = (wr.next_day_work_minutes || 0) > 0;
-          nextDayWorkMinutes.value = wr.next_day_work_minutes || 0;
-          attendanceStatus.value = wr.attendance_status || 'REGULAR_WORK';
-          isScheduledWorkday.value = wr.is_scheduled_workday || false;
-          hasSchedule.value = false;
-          
-          console.log('[WorkDayModal] API 응답의 실제 근로기록 적용:', wr.id);
-        } 
-        // 스케줄 정보가 있으면 기본값으로 설정
-        else if (scheduleInfo.has_schedule && scheduleInfo.start_time && scheduleInfo.end_time) {
-          timeIn.value = scheduleInfo.start_time;  // 이미 HH:MM 형식
-          timeOut.value = scheduleInfo.end_time;   // 이미 HH:MM 형식
-          breakMinutes.value = scheduleInfo.break_minutes || 60;
-          
-          // 익일 근무 정보
-          hasNextDayWork.value = (scheduleInfo.next_day_work_minutes || 0) > 0;
-          nextDayWorkMinutes.value = scheduleInfo.next_day_work_minutes || 0;
-          
-          hasSchedule.value = true;
-          isScheduledWorkday.value = scheduleInfo.is_scheduled_workday || false;
-          attendanceStatus.value = scheduleInfo.suggested_attendance_status || 'REGULAR_WORK';
-          
-          console.log('[WorkDayModal] 스케줄 기본값 적용:', {
-            timeIn: timeIn.value,
-            timeOut: timeOut.value,
-            breakMinutes: breakMinutes.value,
-            hasNextDayWork: hasNextDayWork.value,
-            nextDayWorkMinutes: nextDayWorkMinutes.value,
-            isScheduledWorkday: isScheduledWorkday.value
-          });
+        if (info.has_schedule && info.start_time) {
+            scheduledTimeIn.value = info.start_time
+            scheduledTimeOut.value = info.end_time
+            scheduledBreakMinutes.value = info.break_minutes || 0
+            scheduledNextDay.value = info.next_day_work_minutes || 0
+            hasSchedule.value = true
         } else {
-          // 스케줄 정보도 없으면 빈 값
-          timeIn.value = null;
-          timeOut.value = null;
-          breakMinutes.value = 0;
-          hasNextDayWork.value = false;
-          nextDayWorkMinutes.value = 0;
-          attendanceStatus.value = scheduleInfo.suggested_attendance_status || 'EXTRA_WORK';
-          isScheduledWorkday.value = false;
-          hasSchedule.value = false;
-          
-          console.log('[WorkDayModal] 스케줄 없음, 빈 값으로 초기화');
+            // 스케줄 없음
+            scheduledTimeIn.value = null
+            scheduledTimeOut.value = null
+            scheduledBreakMinutes.value = 0
+            scheduledNextDay.value = 0
+            hasSchedule.value = false
         }
-      } catch (error) {
-        console.error('[WorkDayModal] date-schedule API 호출 실패:', error);
-        // API 실패 시 빈 값으로 초기화
-        timeIn.value = null;
-        timeOut.value = null;
-        breakMinutes.value = 0;
-        hasNextDayWork.value = false;
-        nextDayWorkMinutes.value = 0;
-        attendanceStatus.value = 'REGULAR_WORK';
-        isScheduledWorkday.value = false;
-        hasSchedule.value = false;
-      }
-    } else {
-      // employeeId나 dateIso가 없으면 빈 값
-      timeIn.value = null;
-      timeOut.value = null;
-      breakMinutes.value = 0;
-      hasNextDayWork.value = false;
-      nextDayWorkMinutes.value = 0;
-      attendanceStatus.value = 'REGULAR_WORK';
-      isScheduledWorkday.value = false;
-      hasSchedule.value = false;
+        
+    } catch (e) {
+        console.error('Failed to fetch schedule info', e)
     }
-  }
-}, { immediate: true })
+}
+
+// Watcher: 출결 상태를 '소정근로'로 변경 시, 시간이 비어있으면 스케줄 시간 자동 입력
+watch(attendanceStatus, (newVal) => {
+    if (newVal === 'REGULAR_WORK') {
+        // 시간이 모두 비어있고, 백업된 스케줄이 있다면 복원
+        if (!timeIn.value && !timeOut.value && scheduledTimeIn.value) {
+            timeIn.value = scheduledTimeIn.value
+            timeOut.value = scheduledTimeOut.value
+            breakMinutes.value = scheduledBreakMinutes.value
+            nextDayWorkMinutes.value = scheduledNextDay.value
+            hasNextDayWork.value = scheduledNextDay.value > 0
+        }
+    }
+})
 
 const dateLabel = computed(() => {
   try {

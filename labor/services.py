@@ -86,6 +86,7 @@ def calculate_weekly_holiday_pay_v2(employee, target_date: date) -> Dict[str, An
     end_of_week = start_of_week + timedelta(days=6)
     
     # 주간 소정근로일 및 시간 정보 수집
+    # 소정근로일 목록 수집 및 개근 체크
     scheduled_dates = []
     weekly_scheduled_hours = Decimal('0')
     
@@ -108,10 +109,31 @@ def calculate_weekly_holiday_pay_v2(employee, target_date: date) -> Dict[str, An
                 weekly_scheduled_hours += Decimal(str(max(0.0, total_mins - break_mins) / 60.0))
         current_date += timedelta(days=1)
     
-    # 총 소정근로시간 (계약상 시간 우선)
-    total_weekly_hours = Decimal(str(employee.contract_weekly_hours)) if employee.contract_weekly_hours is not None else weekly_scheduled_hours
+    # 실제 근로 (추가근무 포함) 확인을 위해 레코드 조회
+    records = WorkRecord.objects.filter(employee=employee, work_date__range=[start_of_week, end_of_week])
+    record_map = {r.work_date: r for r in records}
     
-    # 조건 1: 15시간 미만
+    # 실제 근로시간 합계
+    actual_worked_hours = Decimal('0')
+    for r in records:
+        actual_worked_hours += r.get_total_hours()
+
+    # 총 주간 근로시간 결정 (views.py의 holiday_pay 로직과 동일하게 맞춤)
+    # 계약상 시간 우선, 단 실제 근로시간이 더 많아 15시간을 넘기면 그것을 인정
+    is_estimated = employee.contract_weekly_hours is None
+    
+    if not is_estimated:
+        contract_hours = Decimal(str(employee.contract_weekly_hours))
+        # 계약 15시간 미만이나 실제 15시간 이상이면 인정
+        if contract_hours < min_weekly_hours and actual_worked_hours >= min_weekly_hours:
+            total_weekly_hours = actual_worked_hours
+        else:
+            total_weekly_hours = contract_hours
+    else:
+        # 스케줄 vs 실제 중 큰 값
+        total_weekly_hours = max(weekly_scheduled_hours, actual_worked_hours)
+    
+    # 조건 1: 15시간 
     if total_weekly_hours < min_weekly_hours:
         return {
             'amount': 0, 'hours': 0, 'reason': 'less_than_threshold', 
@@ -119,13 +141,11 @@ def calculate_weekly_holiday_pay_v2(employee, target_date: date) -> Dict[str, An
         }
     
     # 조건 2: 소정근로일 개근 여부
-    records = WorkRecord.objects.filter(employee=employee, work_date__range=[start_of_week, end_of_week])
-    record_map = {r.work_date: r for r in records}
-    
     is_perfect = True
     for sd in scheduled_dates:
         record = record_map.get(sd)
-        if not record or record.attendance_status not in ['REGULAR_WORK', 'ANNUAL_LEAVE']:
+        # REGULAR_WORK, ANNUAL_LEAVE, EXTRA_WORK 모두 출근으로 인정
+        if not record or record.attendance_status not in ['REGULAR_WORK', 'ANNUAL_LEAVE', 'EXTRA_WORK']:
             is_perfect = False
             break
             
@@ -136,11 +156,12 @@ def calculate_weekly_holiday_pay_v2(employee, target_date: date) -> Dict[str, An
         }
         
     # 주휴시간 및 금액 계산
-    scheduled_days_count = len(scheduled_dates)
-    if scheduled_days_count > 0:
-        holiday_hours = total_weekly_hours / Decimal(str(scheduled_days_count))
-    else:
-        holiday_hours = Decimal('0')
+    # 주휴시간 계산 (비례 원칙 적용)
+    # 단시간 근로자 주휴수당 = (1주 소정근로시간 / 40시간) × 8시간
+    # 즉, 주간 근로시간 / 5 (단, 최대 8시간 한도)
+    holiday_hours = total_weekly_hours / Decimal('5')
+    if holiday_hours > 8:
+        holiday_hours = Decimal('8')
         
     amount = int(holiday_hours * employee.hourly_rate)
     
@@ -161,39 +182,50 @@ def get_monthly_holiday_pay_info(employee, year: int, month: int) -> Dict[str, A
     
     start_date = date(year, month, 1)
     # 월의 모든 날짜를 포함하는 주들을 찾기 위해 월의 첫날부터 마지막날까지 순회
-    # 단, 주 단위로 건너뛰며 계산
     
     weeks = []
     current_week_start = start_date - timedelta(days=start_date.weekday()) # 해당 월의 첫 날이 포함된 주의 월요일
     
-    # 월의 마지막 날 계산
     import calendar
     _, last_day = calendar.monthrange(year, month)
     end_of_month = date(year, month, last_day)
     
-    # 월의 마지막 날이 포함된 주의 일요일까지 순회
-    last_week_end = end_of_month + timedelta(days=(6 - end_of_month.weekday()))
-    
     while current_week_start <= end_of_month:
         week_end = current_week_start + timedelta(days=6)
         
-        # 해당 주가 선택한 월에 상당 부분 포함되는지 체크 (또는 시작일 기준)
-        # 법적으로는 "주의 종료일" 또는 "주의 시작일"이 해당 월에 포함되는 기준을 따를 수 있음.
-        # 여기서는 주의 시작일이 해당 월에 포함되는 경우를 기준으로 함.
+        # 해당 주가 선택한 월에 포함되는지 체크 (Week End Date 기준)
         if current_week_start.month == month or week_end.month == month:
-            res = calculate_weekly_holiday_pay_v2(employee, current_week_start)
+            # [Fix] 만약 해당 주의 '주휴일(일요일)'이 소정근로일이 아니라고 판정되면(예: 월별 스케줄 삭제로 인해),
+            #       주휴수당 발생 자체가 불가능하므로 제외합니다.
+            #       (사용자가 월별 기록을 삭제했을 때, 이전에 걸친 주의 수당이 남지 않도록 함)
+            #       단, 원래 스케줄이 없는 날이면 상관없으나 'MonthlySchedule'로 명시적 삭제된 경우엔 False가 나옴.
+            #       일반적인 주휴일은 '비근무'지만 '소정근로일'의 일환으로 관리될 수 있음.
+            #       여기서는 'MonthlySchedule'이 존재하고 start_time이 None인 경우를 체크해야 함.
             
-            # 확정 여부: 주의 일요일(week_end)이 오늘 이전이면 확정
-            is_finished = week_end < today
+            # 더 강력한 체크: 해당 주에 '유효한 계획된 근로일'이 하루라도 있는가?
+            # 삭제된 달이라면 모든 요일이 MonthlySchedule(start=None)이므로 is_scheduled_workday가 모두 False임.
+            has_scheduled_day = False
+            temp_date = current_week_start
+            while temp_date <= week_end:
+                if employee.is_scheduled_workday(temp_date):
+                    has_scheduled_day = True
+                    break
+                temp_date += timedelta(days=1)
             
-            weeks.append({
-                'start': current_week_start,
-                'end': week_end,
-                'amount': res['amount'],
-                'is_finished': is_finished,
-                'is_eligible': res['is_eligible'],
-                'reason': res['reason']
-            })
+            if has_scheduled_day:
+                res = calculate_weekly_holiday_pay_v2(employee, current_week_start)
+                
+                # 확정 여부: 주의 일요일(week_end)이 오늘 이전이면 확정
+                is_finished = week_end < today
+                
+                weeks.append({
+                    'start': current_week_start,
+                    'end': week_end,
+                    'amount': res['amount'],
+                    'is_finished': is_finished,
+                    'is_eligible': res['is_eligible'],
+                    'reason': res['reason']
+                })
             
         current_week_start += timedelta(days=7)
         
@@ -283,25 +315,53 @@ def job_to_inputs(employee) -> JobInputs:
     """Employee 모델 인스턴스를 평가 입력 구조로 변환
     
     주당 근로시간은 WorkSchedule에서 동적으로 계산합니다.
+    단, 이번 달(오늘 기준)에 MonthlySchedule이 있다면 그것을 우선 반영합니다.
     """
     from datetime import datetime
-    from .models import WorkSchedule
+    from django.utils import timezone
+    from .models import WorkSchedule, MonthlySchedule
     
-    # 활성화된 스케줄에서 주당 근로시간 계산
-    schedules = WorkSchedule.objects.filter(employee=employee, enabled=True)
+    today = timezone.localdate()
+    year = today.year
+    month = today.month
+    
+    # 1. 월별 스케줄이 있는지 확인 (해당 월의 아무 요일이나)
+    #    (하나라도 있으면 월별 스케줄 모드로 간주)
+    #    정확히는 7일 전체를 봐야 하지만, '이번 달 근로조건'을 평가하는 것이므로
+    #    이번 달에 MonthlySchedule이 존재하면 그것을 기준으로 주당 시간을 산출
+    monthly_schedules = MonthlySchedule.objects.filter(
+        employee=employee,
+        year=year,
+        month=month,
+        enabled=True
+    )
+    
     weekly_hours = 0.0
     work_days_per_week = 0
     
-    for schedule in schedules:
-        if schedule.start_time and schedule.end_time:
-            # 시간 차이 계산
-            dummy_date = datetime(2000, 1, 1)
-            dt_start = datetime.combine(dummy_date.date(), schedule.start_time)
-            dt_end = datetime.combine(dummy_date.date(), schedule.end_time)
-            diff = dt_end - dt_start
-            hours = diff.total_seconds() / 3600
-            weekly_hours += hours
-            work_days_per_week += 1
+    if monthly_schedules.exists():
+        # 월별 스케줄 사용
+        for schedule in monthly_schedules:
+            if schedule.start_time and schedule.end_time:
+                dummy_date = datetime(2000, 1, 1)
+                dt_start = datetime.combine(dummy_date.date(), schedule.start_time)
+                dt_end = datetime.combine(dummy_date.date(), schedule.end_time)
+                diff = dt_end - dt_start
+                hours = diff.total_seconds() / 3600
+                weekly_hours += hours
+                work_days_per_week += 1
+    else:
+        # 주간 스케줄 사용 (fallback)
+        schedules = WorkSchedule.objects.filter(employee=employee, enabled=True)
+        for schedule in schedules:
+            if schedule.start_time and schedule.end_time:
+                dummy_date = datetime(2000, 1, 1)
+                dt_start = datetime.combine(dummy_date.date(), schedule.start_time)
+                dt_end = datetime.combine(dummy_date.date(), schedule.end_time)
+                diff = dt_end - dt_start
+                hours = diff.total_seconds() / 3600
+                weekly_hours += hours
+                work_days_per_week += 1
     
     return JobInputs(
         hourly_rate=float(employee.hourly_rate),
@@ -309,8 +369,8 @@ def job_to_inputs(employee) -> JobInputs:
         work_days_per_week=work_days_per_week if work_days_per_week > 0 else None,
         employment_type=employee.employment_type,
         start_date=employee.start_date,
-        is_current=True,  # 기본값: 재직 중
-        has_paid_weekly_holiday=True,  # 기본값: 주휴수당 있음
+        is_current=True,
+        has_paid_weekly_holiday=True,
         contract_weekly_hours=float(employee.contract_weekly_hours) if employee.contract_weekly_hours is not None else None,
         attendance_rate_last_year=float(employee.attendance_rate_last_year)
         if employee.attendance_rate_last_year is not None
@@ -320,6 +380,14 @@ def job_to_inputs(employee) -> JobInputs:
         else None,
         total_days_last_3m=employee.total_days_last_3m,
     )
+
+
+# ... (calculate_annual_leave_v2, etc stay same) ...
+# ... (calculate_annual_leave) ...
+
+# ... (We need to jump to calculate_retirement_pay to apply fix) ...
+
+
 
 
 def calculate_annual_leave_v2(employee, year: int) -> Dict[str, Any]:
@@ -406,7 +474,19 @@ def calculate_annual_leave_v2(employee, year: int) -> Dict[str, Any]:
                     break
             
             if not has_absent:
-                accrued_days += 1.0
+                # [Fix] "개근"의 전제는 "소정근로일이 존재함"입니다.
+                # 해당 기간 내에 소정근로일이 하루라도 있었는지 확인합니다.
+                # 아예 스케줄이 없는(삭제된) 달에는 연차가 발생하지 않아야 합니다.
+                has_any_schedule = False
+                temp_date = m_start
+                while temp_date <= m_end:
+                    if employee.is_scheduled_workday(temp_date):
+                        has_any_schedule = True
+                        break
+                    temp_date += timedelta(days=1)
+                
+                if has_any_schedule:
+                    accrued_days += 1.0
 
     # 3. 사용 연차(used_days) 계산
     # 해당 연도 내의 ANNUAL_LEAVE 개수
@@ -510,16 +590,21 @@ def monthly_scheduled_dates(employee, year, month):
                 enabled=True
             ).first()
             
-            if monthly_schedule and monthly_schedule.start_time and monthly_schedule.end_time:
-                is_scheduled_workday = True
+            if monthly_schedule:
+                # 월별 스케줄이 존재하면, 시간이 있든 없든 이것을 최종 스케줄로 간주 (fallback 하지 않음)
                 schedule_source = "monthly"
-                scheduled_start_time = monthly_schedule.start_time.strftime('%H:%M')
-                scheduled_end_time = monthly_schedule.end_time.strftime('%H:%M')
-                scheduled_break_minutes = monthly_schedule.break_minutes
-                scheduled_is_overnight = monthly_schedule.is_overnight
-                scheduled_next_day_minutes = monthly_schedule.next_day_work_minutes
+                if monthly_schedule.start_time and monthly_schedule.end_time:
+                    is_scheduled_workday = True
+                    scheduled_start_time = monthly_schedule.start_time.strftime('%H:%M')
+                    scheduled_end_time = monthly_schedule.end_time.strftime('%H:%M')
+                    scheduled_break_minutes = monthly_schedule.break_minutes
+                    scheduled_is_overnight = monthly_schedule.is_overnight
+                    scheduled_next_day_minutes = monthly_schedule.next_day_work_minutes
+                else:
+                    # 시간이 없는 월별 스케줄 = 명시적 근무 없음
+                    is_scheduled_workday = False
             else:
-                # 주간 스케줄 확인 (fallback)
+                # 월별 스케줄이 없을 때만 주간 스케줄 확인 (fallback)
                 weekly_schedule = WorkSchedule.objects.filter(
                     employee=employee,
                     weekday=weekday,
@@ -797,6 +882,7 @@ def compute_monthly_payroll(employee, year, month):
     total_hours = 0.0
     total_work_days = 0
     holiday_hours = 0.0
+    night_hours = 0.0  # [Fix] Initialize night_hours
     for r in records:
         hours = float(r.get_total_hours())
         if hours > 0:
@@ -1012,24 +1098,55 @@ def calculate_retirement_pay(employee) -> Dict[str, Any]:
     if employee.contract_weekly_hours is not None:
         weekly_hours = Decimal(str(employee.contract_weekly_hours))
     else:
-        schedules = WorkSchedule.objects.filter(employee=employee, enabled=True)
-        for schedule in schedules:
-            if schedule.start_time and schedule.end_time:
-                from datetime import datetime
-                dummy_date = datetime(2000, 1, 1)
-                dt_start = datetime.combine(dummy_date.date(), schedule.start_time)
-                dt_end = datetime.combine(dummy_date.date(), schedule.end_time)
-                
-                # [Fix] 오직 퇴근 시간이 출근 시간보다 앞선 경우에만 익일로 간주하여 24시간 더함.
-                if dt_end < dt_start:
-                    dt_end += timedelta(days=1)
-                
-                diff = dt_end - dt_start
-                extra_mins = float(getattr(schedule, 'next_day_work_minutes', 0))
-                total_mins = (diff.total_seconds() / 60.0) + extra_mins
-                break_mins = float(getattr(schedule, 'break_minutes', 0))
-                
-                weekly_hours += Decimal(str(max(0.0, total_mins - break_mins) / 60.0))
+        # [Fix] 이번 달 월별 스케줄이 있으면 그것을 우선 반영 (삭제된 경우 0시간)
+        # 365, today 등은 함수 상단에 있음
+        month_schedules = WorkSchedule.objects.none() # dummy
+        
+        from .models import MonthlySchedule
+        monthly_schedules = MonthlySchedule.objects.filter(
+            employee=employee,
+            year=today.year,
+            month=today.month,
+            enabled=True
+        )
+        
+        if monthly_schedules.exists():
+             # 월별 스케줄 사용
+             for schedule in monthly_schedules:
+                if schedule.start_time and schedule.end_time:
+                    from datetime import datetime
+                    dummy_date = datetime(2000, 1, 1)
+                    dt_start = datetime.combine(dummy_date.date(), schedule.start_time)
+                    dt_end = datetime.combine(dummy_date.date(), schedule.end_time)
+                    
+                    if dt_end < dt_start:
+                        dt_end += timedelta(days=1)
+                    
+                    diff = dt_end - dt_start
+                    extra_mins = float(getattr(schedule, 'next_day_work_minutes', 0))
+                    total_mins = (diff.total_seconds() / 60.0) + extra_mins
+                    break_mins = float(getattr(schedule, 'break_minutes', 0))
+                    
+                    weekly_hours += Decimal(str(max(0.0, total_mins - break_mins) / 60.0))
+        else:
+            # 주간 스케줄 사용 (fallback)
+            schedules = WorkSchedule.objects.filter(employee=employee, enabled=True)
+            for schedule in schedules:
+                if schedule.start_time and schedule.end_time:
+                    from datetime import datetime
+                    dummy_date = datetime(2000, 1, 1)
+                    dt_start = datetime.combine(dummy_date.date(), schedule.start_time)
+                    dt_end = datetime.combine(dummy_date.date(), schedule.end_time)
+                    
+                    if dt_end < dt_start:
+                        dt_end += timedelta(days=1)
+                    
+                    diff = dt_end - dt_start
+                    extra_mins = float(getattr(schedule, 'next_day_work_minutes', 0))
+                    total_mins = (diff.total_seconds() / 60.0) + extra_mins
+                    break_mins = float(getattr(schedule, 'break_minutes', 0))
+                    
+                    weekly_hours += Decimal(str(max(0.0, total_mins - break_mins) / 60.0))
     
     if weekly_hours < 15:
         return {

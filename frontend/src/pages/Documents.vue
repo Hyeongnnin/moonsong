@@ -1,6 +1,6 @@
 <template>
   <section class="space-y-4">
-    <h2 class="text-2xl font-semibold mb-4">근로서류</h2>
+    <h2 class="text-2xl font-semibold mb-4">알바서류</h2>
     <div class="space-y-4 mt-4">
       <!-- 탭 -->
       <div class="flex gap-2 border-b border-gray-200 pb-2">

@@ -2,7 +2,7 @@
   <div class="max-w-2xl mx-auto">
     <!-- 헤더 -->
     <div class="mb-6">
-      <h1 class="text-2xl font-bold text-gray-900 mb-2">근로정보 수정</h1>
+      <h1 class="text-2xl font-bold text-gray-900 mb-2">알바 근로정보 수정</h1>
       <p class="text-sm text-gray-600">현재 선택된 알바의 근로조건을 수정할 수 있습니다.</p>
     </div>
 
@@ -96,6 +96,19 @@
             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent transition">
         </div>
 
+        <!-- 기본 정보만 별도 저장 버튼 -->
+        <div class="mb-8 flex justify-end">
+          <button
+            type="button"
+            @click="saveBasicInfo"
+            :disabled="isSubmitting"
+            class="px-4 py-2 text-sm font-medium text-brand-700 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors flex items-center gap-2"
+          >
+            <span v-if="!isSubmitting">📝 기본 정보만 저장</span>
+            <span v-else>저장 중...</span>
+          </button>
+        </div>
+
         <!-- 주간 스케줄 편집기 -->
         <div class="mb-6">
           <h2 class="text-lg font-semibold text-gray-900 mb-2">주간 근무 스케줄</h2>
@@ -159,7 +172,7 @@
             type="submit"
             :disabled="isSubmitting"
             class="px-6 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 flex items-center gap-2">
-            <span v-if="!isSubmitting">{{ activeJob ? '저장하기' : '등록하고 선택하기' }}</span>
+            <span v-if="!isSubmitting">{{ activeJob ? '전체 저장하기' : '등록하고 선택하기' }}</span>
             <span v-else>저장 중...</span>
           </button>
         </div>
@@ -287,11 +300,62 @@ function formatWage(v: number) {
 }
 
 /**
+ * 기본 정보만 저장 (스케줄 제외)
+ */
+async function saveBasicInfo() {
+  if (!activeJob.value) {
+    alert('새 알바 등록 시에는 하단의 [등록하고 선택하기]를 이용해주세요.')
+    return
+  }
+  
+  isSubmitting.value = true
+  submitError.value = null
+  
+  try {
+    // 기본 정보만 포함된 페이로드 준비
+    const payload: any = {
+      workplace_name: formData.workplace_name,
+      is_workplace_over_5: formData.is_workplace_over_5,
+      hourly_rate: formData.hourly_rate,
+      deduction_type: formData.deduction_type,
+    }
+    
+    // Normalize dates
+    const sd = formatDateForApi(formData.start_date)
+    if (sd) {
+      payload.start_date = sd
+    }
+
+    // PATCH 요청
+    await apiClient.patch(`/labor/employees/${activeJob.value.id}/`, payload)
+    
+    // 스토어 및 데이터 갱신
+    await fetchJobs()
+    const month = getMonthString()
+    await fetchJobSummary(activeJob.value.id, month)
+    try {
+      await fetchEvaluation(activeJob.value.id)
+    } catch (e) {}
+    
+    window.dispatchEvent(new CustomEvent('job-updated'))
+    window.dispatchEvent(new CustomEvent('labor-updated')) // 통계/업적 갱신용
+    
+    alert('기본 정보가 저장되었습니다.')
+    
+  } catch (err: any) {
+    console.error('Failed to save basic info:', err)
+    submitError.value = '기본 정보 저장 실패: ' + (err?.response?.data?.detail || '알 수 없는 오류')
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
+/**
  * 폼 제출: PATCH 요청으로 데이터 저장
  */
 async function submitForm() {
   // 저장 확인
-  if (!confirm('근로정보를 저장하시겠습니까?')) {
+  if (!confirm('근로정보를 전체 저장하시겠습니까?')) {
     return
   }
 
@@ -375,7 +439,8 @@ async function submitForm() {
       console.warn('평가 결과 재조회 실패', e)
     }
     window.dispatchEvent(new CustomEvent('job-updated'))
-
+    window.dispatchEvent(new CustomEvent('labor-updated')) // 통계 갱신용
+    
     console.log('근로정보 저장 및 평가 갱신 완료')
     
     // 저장 성공 알림 표시

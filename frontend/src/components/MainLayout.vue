@@ -117,11 +117,11 @@ const LaborDiagnosisSection = defineAsyncComponent(() => import('../pages/LaborD
 
 // Section definitions
 const sections = [
-  { id: 'labor', label: '근로관리' },
-  { id: 'diagnosis', label: '근로진단' },
-  { id: 'ai-consult', label: 'AI상담' },
-  { id: 'profile-edit', label: '근로정보 수정' },
-  { id: 'documents', label: '근로서류' },
+  { id: 'labor', label: '내 알바 관리' },
+  { id: 'diagnosis', label: '알바 근로진단' },
+  { id: 'ai-consult', label: 'AI 알바상담' },
+  { id: 'profile-edit', label: '알바 근로정보 수정' },
+  { id: 'documents', label: '알바서류' },
 ]
 
 // Active section state (0-4)

@@ -6,26 +6,19 @@
 
 
 
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-3 cursor-pointer" @click="$emit('navigate', 'landing')">
         <img src="@/assets/logo.png" alt="Notav" class="h-10 w-auto" />
       </div>
 
 
-      <nav class="hidden md:flex items-center gap-6 text-sm">
-        <button class="text-gray-600 hover:text-gray-900" @click="$emit('navigate', 'landing')">
-          홈
-        </button>
-        <button class="text-gray-600 hover:text-gray-900" @click="$emit('navigate', 'signup')">
-          회원가입
-        </button>
-      </nav>
+
 
       <div class="flex items-center gap-3">
         <button
           class="hidden sm:inline-flex items-center px-3 py-1.5 text-sm rounded-full border border-gray-200 text-gray-700 hover:bg-gray-50"
           @click="$emit('navigate', 'signup')"
         >
-          무료 진단 시작
+          회원가입
         </button>
         <button
           class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-full bg-brand-600 text-white hover:bg-brand-700"

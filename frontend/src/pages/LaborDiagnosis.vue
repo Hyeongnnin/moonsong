@@ -2,7 +2,7 @@
   <div class="max-w-4xl mx-auto">
     <!-- 헤더 -->
     <div class="mb-6">
-      <h1 class="text-2xl font-bold text-gray-900 mb-2">근로진단</h1>
+      <h1 class="text-2xl font-bold text-gray-900 mb-2">알바 근로진단</h1>
       <p class="text-sm text-gray-600">현재 알바는 어떤 근로조건인지 확인해 보세요</p>
     </div>
 
@@ -322,7 +322,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useJob } from '../stores/jobStore';
 import { apiClient } from '../api';
@@ -331,6 +331,11 @@ const router = useRouter();
 const { activeJob } = useJob();
 
 const loadingHolidayPay = ref(false);
+// ... (omitted)
+
+
+
+
 const errorHolidayPay = ref(false);
 
 const holidayPayData = ref({
@@ -517,7 +522,7 @@ const fetchDiagnosisData = async () => {
     const data = response.data;
 
     const eligible = data.amount > 0;
-    const weeklyHours = data.actual_worked_hours || data.weekly_scheduled_hours || data.weekly_hours || 0;
+    const weeklyHours = Math.max(data.actual_worked_hours || 0, data.weekly_scheduled_hours || 0, data.weekly_hours || 0);
     const threshold = data.policy_threshold || 15;
     const reason = data.reason || '';
 
@@ -559,13 +564,23 @@ const fetchDiagnosisData = async () => {
     const today = new Date();
     const lastWeekDate = new Date(today);
     lastWeekDate.setDate(today.getDate() - 7);
-    const lastWeekDateStr = lastWeekDate.toISOString().split('T')[0];
+    
+    // 로컬 타임존 기준 날짜 문자열 생성 (YYYY-MM-DD)
+    const year = lastWeekDate.getFullYear();
+    const month = String(lastWeekDate.getMonth() + 1).padStart(2, '0');
+    const day = String(lastWeekDate.getDate()).padStart(2, '0');
+    const lastWeekDateStr = `${year}-${month}-${day}`;
 
-    const lwResponse = await apiClient.get(`/labor/employees/${activeJob.value.id}/holiday-pay/`, { params: { date: lastWeekDateStr } });
+    const lwResponse = await apiClient.get(`/labor/employees/${activeJob.value.id}/holiday-pay/`, { 
+      params: { 
+        date: lastWeekDateStr,
+        _t: Date.now() 
+      } 
+    });
     const lwData = lwResponse.data;
 
     const lwEligible = lwData.amount > 0;
-    const lwWeeklyHours = lwData.actual_worked_hours || lwData.weekly_scheduled_hours || lwData.weekly_hours || 0;
+    const lwWeeklyHours = Math.max(lwData.actual_worked_hours || 0, lwData.weekly_scheduled_hours || 0, lwData.weekly_hours || 0);
     const lwReason = lwData.reason || '';
 
     const lwCriteria = {
@@ -628,10 +643,21 @@ const fetchDiagnosisData = async () => {
   }
 };
 
+const handleLaborUpdate = () => {
+  if (activeJob.value) {
+    fetchDiagnosisData();
+  }
+};
+
 onMounted(() => {
   if (activeJob.value) {
     fetchDiagnosisData();
   }
+  window.addEventListener('labor-updated', handleLaborUpdate);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('labor-updated', handleLaborUpdate);
 });
 
 watch(() => activeJob.value?.id, () => {

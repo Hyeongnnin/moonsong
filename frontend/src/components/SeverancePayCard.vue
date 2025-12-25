@@ -29,10 +29,7 @@
 
       <!-- 정보 리스트 -->
       <div class="space-y-3">
-        <div class="flex justify-between items-baseline">
-          <span class="text-xs text-gray-500 font-medium">평균임금 (일급)</span>
-          <span class="text-sm font-semibold text-gray-800">{{ formatCurrency(result.avg_daily_wage) }}</span>
-        </div>
+
         <div class="flex justify-between items-baseline">
           <span class="text-xs text-gray-500 font-medium">재직기간</span>
           <span class="text-sm font-semibold text-gray-800">
@@ -104,10 +101,7 @@
                 <span class="text-xs text-gray-500">계약 시급/시간</span>
                 <span class="text-xs font-bold text-gray-900">{{ formatCurrency(result.hourly_rate || 0) }} / {{ result.contract_weekly_hours }}h</span>
               </div>
-              <div class="flex justify-between">
-                <span class="text-xs text-gray-500">평균임금 (일급)</span>
-                <span class="text-xs font-bold text-gray-900">{{ formatCurrency(result.avg_daily_wage) }}</span>
-              </div>
+
               <div class="flex justify-between">
                 <span class="text-xs text-gray-500">총 재직일수</span>
                 <span class="text-xs font-bold text-gray-900">{{ result.service_days }}일</span>

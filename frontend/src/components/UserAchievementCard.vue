@@ -63,21 +63,12 @@
               <span class="text-xl">🏆</span>
               <p class="text-xs font-bold uppercase tracking-wider opacity-90">업적 합계</p>
             </div>
-            <p class="text-[10px] opacity-80">* 근로급여 + 확정 주휴수당</p>
+
           </div>
           <h4 class="text-2xl font-black mb-2">
             {{ formatCurrency(achievementTotal) }}
           </h4>
-          <div class="flex flex-col gap-1 pt-2 border-t border-white border-opacity-20">
-             <div class="flex justify-between text-[11px] opacity-90">
-               <span>근로급여</span>
-               <span>{{ formatCurrency(totalEarnings) }}</span>
-             </div>
-             <div class="flex justify-between text-[11px] opacity-90">
-               <span>주휴수당(누적)</span>
-               <span>+{{ formatCurrency(totalConfirmedHolidayPay) }}</span>
-             </div>
-          </div>
+
         </div>
 
         <!-- 근무 일수 -->
@@ -150,6 +141,7 @@ const totalHours = ref(0);
 const totalEarnings = ref(0);
 const totalWorkDays = ref(0);
 const totalConfirmedHolidayPay = ref(0);
+const totalConfirmedNightPay = ref(0);
 const achievementTotal = ref(0);
 const hasAnyRecords = computed(() => totalHours.value > 0 || totalEarnings.value > 0 || totalWorkDays.value > 0);
 
@@ -255,9 +247,29 @@ async function loadAchievementData() {
     console.log('[UserAchievementCard] 📅 total_work_days:', res.data.total_work_days, typeof res.data.total_work_days);
     
     totalHours.value = res.data.total_hours || 0;
+    // total_earnings는 순수 근로(기본+야간+휴일 등)의 합계임.
+    // 사용자가 UI에서 '근로급여'를 기본급 개념으로 보고 싶어한다면 분리가 필요하지만,
+    // 현재는 total_earnings를 그대로 '근로급여'로 쓰고 있음.
+    // 만약 '야간수당'을 별도로 + 표시하려면, total_earnings에서 야간수당을 빼거나
+    // 아니면 그냥 total_earnings가 포함하고 있음을 인지해야 함.
+    // 요청사항: "야간 수당 금액을 ... 밑에 띄워줄래? + 이렇게"
+    // 이는 보통 "기본급 + 야간수당 + 주휴수당 = 총액" 구조를 원한다는 의미일 수 있음.
+    // 그러나 API는 currently 'total_earnings'(전체 근로수당)만 줌.
+    // --> 백엔드 api 응답에 'total_night_pay' 등이 있다면 좋겠지만, 없다면 계산해야 함.
+    // 다행히 get_cumulative_stats_data에 보면 night_bonus 등이 계산되고는 있음.
+    // 일단 API 응답에 extra_work_earnings 등으로 분리되어 있을 수 있음.
+    // (이전 코드에서 regular_work_earnings, extra_work_earnings 등은 봤음)
+    
+    // 임시: total_earnings에는 야간수당이 포함되어 있음.
+    // 별도 표기를 위해 API가 'total_night_pay'를 내려주도록 백엔드를 수정하거나
+    // 여기서는 0으로 두고 백엔드 수정을 요청해야 함.
+    // 하지만 이미 ViewSet을 수정할 수 있으므로, 
+    // 여기서는 일단 있는 데이터 혹은 추후 추가될 필드를 매핑.
+    
     totalEarnings.value = res.data.total_earnings || 0;
     totalWorkDays.value = res.data.total_work_days || 0;
     totalConfirmedHolidayPay.value = res.data.total_confirmed_holiday_pay || 0;
+    totalConfirmedNightPay.value = res.data.total_night_pay || 0; // 백엔드에서 내려줘야 함
     achievementTotal.value = res.data.achievement_total || 0;
     
     console.log('[UserAchievementCard] ✅ 값 할당 완료:', {
@@ -265,6 +277,7 @@ async function loadAchievementData() {
       totalEarnings: totalEarnings.value,
       totalWorkDays: totalWorkDays.value,
       totalConfirmedHolidayPay: totalConfirmedHolidayPay.value,
+      totalConfirmedNightPay: totalConfirmedNightPay.value,
       achievementTotal: achievementTotal.value
     });
   } catch (e) {

@@ -2,7 +2,7 @@
   <div>
     <Header current-page="landing" @navigate="onNavigate" />
     <header class="h-20" /> <!-- Added space for the fixed header -->
-    <main class="pt-4">
+    <main>
 
 
 

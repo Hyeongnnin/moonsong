@@ -3,7 +3,7 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action, api_view, permission_classes as drf_permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, time
 from dateutil.relativedelta import relativedelta
 from decimal import Decimal
 from typing import List
@@ -263,7 +263,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                 record = record_map.get(current_date)
                 if record:
                     # REGULAR_WORK 또는 ANNUAL_LEAVE만 출근 인정
-                    is_attended = record.attendance_status in ['REGULAR_WORK', 'ANNUAL_LEAVE']
+                    is_attended = record.attendance_status in ['REGULAR_WORK', 'EXTRA_WORK', 'ANNUAL_LEAVE']
                     attendance_details.append({
                         'date': current_date.isoformat(),
                         'is_scheduled': True,
@@ -287,10 +287,32 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             current_date += timedelta(days=1)
 
         scheduled_days_count = len(scheduled_dates)
-        
+
+        # 실제 근로시간 합계 (추가근무 포함)
+        actual_worked_hours = Decimal('0')
+        for r in records:
+            actual_worked_hours += r.get_total_hours()
+
         # 주간 소정근로시간 결정: 계약상 시간 우선, 없으면 스케줄 합산
         is_estimated = job.contract_weekly_hours is None
-        total_weekly_hours = Decimal(str(job.contract_weekly_hours)) if not is_estimated else weekly_scheduled_hours
+        
+        if not is_estimated:
+            # 계약 시간이 있어도, 실제 근로시간이 현저히 많으면(예: 추가근무 포함 15시간 이상) 실제 시간을 고려해야 한다는 사용자 요구 반영
+            # 단, 법적으로는 소정근로시간 기준이 원칙이므로, '진단' 목적상 유리한 쪽으로 해석하거나
+            # 사용자가 '추가근무'를 통해 15시간을 넘겼을 때 인정을 원하므로 max 로직 적용 고려
+            # 여기서는 우선순위를 (계약상 시간 -> 없으면 스케줄)로 유지하되,
+            # *진단* 단계에서 '15시간 미만'으로 탈락하는 것을 방지하기 위해 
+            # 계약 시간이 15시간 미만이라도 실제 근로가 15시간 이상이면 통과시키도록 로직 보완
+            
+            contract_hours = Decimal(str(job.contract_weekly_hours))
+            if contract_hours < min_weekly_hours and actual_worked_hours >= min_weekly_hours:
+                # 계약은 15시간 미만이지만 실제로는 15시간 이상 일한 경우 (사용자 기대 부응)
+                total_weekly_hours = actual_worked_hours
+            else:
+                total_weekly_hours = contract_hours
+        else:
+            # 스케줄 기반일 경우, 스케줄 시간과 실제 근로시간 중 큰 값을 사용하여 판정 (추가근무 포함)
+            total_weekly_hours = max(weekly_scheduled_hours, actual_worked_hours)
 
         # 조건 1: 주 15시간 미만이면 0원
         if total_weekly_hours < min_weekly_hours:
@@ -298,7 +320,8 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                 'amount': 0,
                 'hours': 0,
                 'reason': 'less_than_threshold',
-                'weekly_scheduled_hours': float(total_weekly_hours),
+                'weekly_scheduled_hours': float(weekly_scheduled_hours),
+                'actual_worked_hours': float(actual_worked_hours),
                 'scheduled_days_count': scheduled_days_count,
                 'perfect_attendance': perfect_attendance,
                 'attendance_details': attendance_details,
@@ -314,7 +337,8 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                 'amount': 0,
                 'hours': 0,
                 'reason': 'not_perfect_attendance',
-                'weekly_scheduled_hours': float(total_weekly_hours),
+                'weekly_scheduled_hours': float(weekly_scheduled_hours),
+                'actual_worked_hours': float(actual_worked_hours),
                 'scheduled_days_count': scheduled_days_count,
                 'perfect_attendance': perfect_attendance,
                 'attendance_details': attendance_details,
@@ -323,6 +347,8 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                 'week_end': end_of_week.isoformat(),
                 'is_estimated': is_estimated
             })
+
+
 
         # 1일 소정근로시간 (주휴시간) 계산
         if scheduled_days_count > 0:
@@ -337,7 +363,8 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             'amount': float(holiday_pay),
             'hours': float(daily_avg_hours),
             'reason': 'eligible',
-            'weekly_scheduled_hours': float(total_weekly_hours),
+            'weekly_scheduled_hours': float(weekly_scheduled_hours),
+            'actual_worked_hours': float(actual_worked_hours),
             'scheduled_days_count': scheduled_days_count,
             'perfect_attendance': perfect_attendance,
             'attendance_details': attendance_details,
@@ -372,14 +399,24 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'], url_path='annual-leave')
     def annual_leave(self, request, pk=None):
         """연차휴가 요약
-
+        
         GET /api/labor/jobs/<id>/annual-leave/
-        응답: { total, used, available }
         """
         job = self.get_object()
-        inputs = job_to_inputs(job)
-        result = calculate_annual_leave(inputs)
-        return Response(result)
+        # [Fix] Use V2 logic for consistency with diagnosis
+        from .services import calculate_annual_leave_v2
+        today = timezone.localdate()
+        result = calculate_annual_leave_v2(job, today.year)
+        
+        # V2 returns {eligible, accrued_days, used_days, remaining_days}
+        # Card expects {total, used, available}
+        return Response({
+            'total': result['accrued_days'],
+            'used': result['used_days'],
+            'available': result['remaining_days'],
+            'is_eligible': result['eligible'],
+            'reason': result['reason']
+        })
 
     @action(detail=True, methods=['get'], url_path='retirement-pay')
     def retirement_pay(self, request, pk=None):
@@ -676,7 +713,8 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         work_records_count = work_records.count()
         work_records.delete()
         
-        # 2. 해당 월의 월별 스케줄(MonthlySchedule) 삭제
+        # 2. 해당 월의 월별 스케줄(MonthlySchedule) 삭제 후,
+        #    기본 주간 스케줄(WorkSchedule)이 드러나지 않도록 "비워진" 스케줄로 덮어쓰기
         monthly_schedules = MonthlySchedule.objects.filter(
             employee=job,
             year=year,
@@ -684,6 +722,22 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         )
         monthly_schedules_count = monthly_schedules.count()
         monthly_schedules.delete()
+        
+        # 모든 요일(0~6)에 대해 '시간 없음(start_time=None)'으로 설정된 MonthlySchedule 생성
+        # enabled=True여야 is_scheduled_workday에서 WorkSchedule로 넘어가지 않고 '근무 없음'으로 판정됨
+        new_monthly_schedules = []
+        for wd in range(7):
+            new_monthly_schedules.append(MonthlySchedule(
+                employee=job,
+                year=year,
+                month=mon,
+                weekday=wd,
+                enabled=True,     # 활성화 상태지만
+                start_time=None,  # 시간은 없음 -> 소정근로일 아님
+                end_time=None,
+                break_minutes=0
+            ))
+        MonthlySchedule.objects.bulk_create(new_monthly_schedules)
         
         total_deleted = work_records_count + monthly_schedules_count
         
@@ -717,265 +771,100 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         }, status=status.HTTP_200_OK)
     
     def get_cumulative_stats_data(self, job):
-        """누적 통계 계산 헬퍼 메소드 - 실제 근로기록만 집계 (전체 기간)
-
-        Phase 2 변경점:
-        - attendance_status별 통계 추가
-        - 소정근로일 vs 추가근무 구분 통계
+        """누적 통계 계산 헬퍼 메소드 - 월별 급여 예상액의 합계로 변경 (v5)
+        
+        사용자 요청: "업적 합계의 금액도 그냥 급여 예상액의 합산이면 돼"
+        따라서 개별 WorkRecord 집계 대신, 매월의 compute_monthly_schedule_stats 결과를 합산합니다.
         """
         today = timezone.localdate()
-
-        # 실제 근로기록만 조회 (스케줄 기반 예상 근로는 제외)
-        work_records = WorkRecord.objects.filter(
-            employee=job,
-            work_date__lte=today
-        ).order_by('work_date')
-
-        from .holidays import get_holidays_for_month
-        from .services import calculate_annual_leave_v2
+        from .services import compute_monthly_schedule_stats
         
-        total_hours = Decimal('0.0')
-        total_earnings = Decimal('0.0')
-        total_work_days = 0
-        record_ids = []
-        records_debug = []
-        
-        # Phase 2: 출결 상태별 통계
-        regular_work_hours = Decimal('0.0')
-        extra_work_hours = Decimal('0.0')
-        regular_work_days = 0
-        extra_work_days = 0
-        annual_leave_days = 0
-        absent_days = 0
-        sick_leave_days = 0
-
-        # 연도별/월별로 공휴일 정보를 캐싱하여 반복적인 API/DB 조회를 방지할 수 있지만, 
-        # 여기서는 단순함을 위해 각 기록의 날짜에 대해 체크하거나 월 단위로 묶어서 처리합니다.
-        # 누적 통계는 기록이 많을 수 있으므로 최적화가 필요할 수 있습니다.
-        
-        hourly_rate = job.hourly_rate or Decimal('0.0')
-        is_over_5 = job.is_workplace_over_5
-
-        # 기록들의 연/월 범위를 구함
-        if work_records.exists():
-            dates = work_records.values_list('work_date', flat=True)
-            min_date = min(dates)
-            max_date = max(dates)
+        # 1. 근무 시작일부터 오늘까지의 월 리스트 확보
+        # 시작일이 없으면 오늘이 속한 달만 계산
+        start_date = job.start_date or today
+        if start_date > today:
+            # 아직 근무 시작 전이면 0
+            return {
+                'total_hours': 0, 'total_earnings': 0, 'total_work_days': 0,
+                'total_confirmed_holiday_pay': 0, 'achievement_total': 0,
+                'start_date': None
+            }
             
-            # 모든 해당 월의 공휴일 수집
-            all_holidays = {} # (year, month) -> set of holiday dates
-            curr_y, curr_m = min_date.year, min_date.month
-            while (curr_y, curr_m) <= (max_date.year, max_date.month):
-                h_list = get_holidays_for_month(curr_y, curr_m)
-                all_holidays[(curr_y, curr_m)] = {h['date'] for h in h_list if h['type'] == 'LEGAL'}
-                if curr_m == 12:
-                    curr_y += 1
-                    curr_m = 1
-                else:
-                    curr_m += 1
-
-            for record in work_records:
-                hours = record.get_total_hours()
-                attendance_status = record.attendance_status or 'REGULAR_WORK'
-                dt = record.work_date
-                
-                # 휴일 여부 판정
-                is_holiday = False
-                if dt.weekday() == 6: # Sunday
-                    is_holiday = True
-                else:
-                    h_set = all_holidays.get((dt.year, dt.month), set())
-                    if dt.isoformat() in h_set:
-                        is_holiday = True
-
-                # 디버깅용 상세 내역 수집
-                records_debug.append({
-                    'id': record.id,
-                    'date': dt.isoformat(),
-                    'time_in': record.time_in.isoformat() if record.time_in else None,
-                    'time_out': record.time_out.isoformat() if record.time_out else None,
-                    'break_minutes': record.break_minutes,
-                    'daily_work_minutes': float(hours) * 60.0 if hours else 0.0,
-                    'attendance_status': attendance_status,
-                    'is_holiday': is_holiday
-                })
-                
-                if hours > 0:
-                    total_hours += hours
-                    record_ids.append(record.id)
-                    
-                    # 수당 계산
-                    day_pay = hours * hourly_rate
-                    if is_over_5:
-                        # 1. 휴일 가산 수당 (50%)
-                        if is_holiday:
-                            day_pay += hours * hourly_rate * Decimal('0.5')
-                        
-                        # 2. 야간 가산 수당 (50%)
-                        night_h = record.get_night_hours()
-                        if night_h > 0:
-                            day_pay += night_h * hourly_rate * Decimal('0.5')
-                    
-                    total_earnings += day_pay
-                    
-                    if attendance_status == 'REGULAR_WORK':
-                        regular_work_hours += hours
-                        regular_work_days += 1
-                        total_work_days += 1
-                    elif attendance_status == 'EXTRA_WORK':
-                        extra_work_hours += hours
-                        extra_work_days += 1
-                        total_work_days += 1
-                
-                if attendance_status == 'ANNUAL_LEAVE':
-                    annual_leave_days += 1
-                elif attendance_status == 'ABSENT':
-                    absent_days += 1
-                elif attendance_status == 'SICK_LEAVE':
-                    sick_leave_days += 1
-
-        # Future Scheduled Work (Remainder of Current Month)
-        # 사용자 요청: 현재 월의 남은 기간에 대한 예정된 근무도 누적 통계에 포함
-        from calendar import monthrange
-        if True: #Indent block preservation trick for readability if needed, but here we just dedent
-            _, last_day_of_month = monthrange(today.year, today.month)
-            month_end = date(today.year, today.month, last_day_of_month)
-            
-            curr_future = today + timedelta(days=1)
-            while curr_future <= month_end:
-                # 미래에 이미 WorkRecord가 존재할 수도 있음 (예: 미리 휴가 신청)
-                # 이 경우 위 루프에서 처리되지 않았으므로(lte=today 필터 때문), 여기서 확인 필요
-                # 하지만 get_cumulative_stats_data는 원래 '실적' 위주였음.
-                # 편의상 미래의 WorkRecord는 아직 없다고 가정하거나, 있어도 스케줄대로 계산
-                # (정확히 하려면 WorkRecord 조회 조건을 전체로 넓히고 loop에서 today 기준으로 분기하는게 낫지만,
-                #  기존 로직 최소 침습을 위해 별도 루프로 처리)
-                
-                # 해당 날짜의 WorkRecord 확인
-                future_record = WorkRecord.objects.filter(employee=job, work_date=curr_future).first()
-                f_hours = 0.0
-                f_pay = Decimal('0')
-                is_f_worked = False
-                
-                if future_record:
-                    # 기록이 있으면 기록 우선 (단, 결근 등 제외)
-                    if future_record.attendance_status in ['REGULAR_WORK', 'EXTRA_WORK', 'ANNUAL_LEAVE']:
-                        is_f_worked = True # 연차도 근무일수에는 포함 안하지만 급여는 줌? 위 로직엔 연차 급여 없음. 
-                        # 위 로직(808)에 따르면 day_pay = hours * hourly_rate.
-                        # 연차여도 시간 있으면 돈 줌.
-                        if future_record.get_total_hours() > 0:
-                            f_hours = float(future_record.get_total_hours())
-                else:
-                    # 기록 없으면 스케줄 확인
-                    if job.is_scheduled_workday(curr_future):
-                        s_info = job.get_schedule_for_date(curr_future)
-                        if s_info['is_scheduled']:
-                             dummy_date = date(2000, 1, 1)
-                             if s_info['start_time'] and s_info['end_time']:
-                                dt_start = datetime.combine(dummy_date, s_info['start_time'])
-                                dt_end = datetime.combine(dummy_date, s_info['end_time'])
-                                if dt_end < dt_start:
-                                    dt_end += timedelta(days=1)
-                                dur = (dt_end - dt_start).total_seconds() / 60.0 + float(s_info.get('next_day_work_minutes', 0))
-                                brk = float(s_info.get('break_minutes', 0))
-                                f_hours = max(0.0, (dur - brk) / 60.0)
-                                is_f_worked = True
-                
-                if f_hours > 0:
-                    total_hours += Decimal(str(f_hours))
-                    # 수당 계산 (야간/휴일 등은 복잡하니 기본급만 추정하거나, 위와 동일 로직 적용)
-                    # 여기선 일단 기본급만 적용 (단순화)
-                    f_pay = Decimal(str(f_hours)) * hourly_rate
-                    total_earnings += f_pay
-                    
-                    if is_f_worked:
-                        total_work_days += 1
-                        # 미래는 일단 'REGULAR_WORK'로 간주하여 카운트
-                        regular_work_days += 1
-                        regular_work_hours += Decimal(str(f_hours))
-                
-                curr_future += timedelta(days=1)
-
-            total_earnings = total_earnings.quantize(Decimal('1')) # 원 단위 절사
-            regular_work_earnings = regular_work_hours * hourly_rate
-            extra_work_earnings = extra_work_hours * hourly_rate
-        else:
-            # 기록이 없는 경우 초기화
-            hourly_rate = job.hourly_rate or Decimal('0.0')
-            regular_work_earnings = Decimal('0.0')
-            extra_work_earnings = Decimal('0.0')
-
-        logger.info(
-            f"[get_cumulative_stats_data] Job {job.id}: "
-            f"records={work_records.count()}, hours={total_hours}, "
-            f"days={total_work_days}, earnings={total_earnings}, "
-            f"regular={regular_work_days}d/{regular_work_hours}h, "
-            f"extra={extra_work_days}d/{extra_work_hours}h"
-        )
-
-        # 집계 시작일은 실제 기록 중 가장 이른 날짜로 설정 (없으면 None)
-        earliest = work_records.first().work_date if work_records.exists() else None
+        # 월 순회 (YYYY-MM)
+        start_y, start_m = start_date.year, start_date.month
+        end_y, end_m = today.year, today.month
         
-        # Phase 3: 누적 확정 주휴수당 계산 (이미 종료된 주만 합산)
-        total_confirmed_holiday_pay = 0
-        if earliest:
-            from .services import calculate_weekly_holiday_pay_v2
-            # 근로 시작일부터 오늘까지 주 단위로 순회
-            # 주의 시작인 월요일부터 계산 시작
-            curr_week_start = earliest - timedelta(days=earliest.weekday())
-            while curr_week_start <= today:
-                week_end = curr_week_start + timedelta(days=6)
-                # 주의 종료일이 오늘보다 이전이면 확정분으로 간주
-                if week_end < today:
-                    h_res = calculate_weekly_holiday_pay_v2(job, curr_week_start)
-                    total_confirmed_holiday_pay += h_res['amount']
-                curr_week_start += timedelta(days=7)
-
-        # 공제 계산 (누적 업적용)
-        import math
-        gross_pay = float(total_earnings) + total_confirmed_holiday_pay
-        total_deduction = 0
-
-        if job.deduction_type == 'FOUR_INSURANCE':
-            # 국민연금 4.5%
-            pension = math.floor((gross_pay * 0.045) / 10) * 10
-            # 건강보험 3.545%
-            health = math.floor((gross_pay * 0.03545) / 10) * 10
-            # 장기요양보험 (건강보험의 12.95%)
-            care = math.floor((health * 0.1295) / 10) * 10
-            # 고용보험 0.9%
-            employment = math.floor((gross_pay * 0.009) / 10) * 10
-            
-            total_deduction = pension + health + care + employment
-            
-        elif job.deduction_type == 'FREELANCE':
-            # 3.3%
-            tax = math.floor((gross_pay * 0.033) / 10) * 10
-            total_deduction = tax
+        cumulative_hours = 0.0
+        cumulative_pay = 0
+        cumulative_days = 0
         
-        achievement_total = gross_pay - total_deduction
-
+        # 순수 근로급여와 주휴수당 분리 집계 (UI 표시용)
+        cumulative_base_pay = 0 # base + overtime + night + holiday (주휴 제외)
+        cumulative_holiday_pay = 0
+        cumulative_night_pay = 0 # 야간수당 누적
+        
+        curr_y, curr_m = start_y, start_m
+        
+        while (curr_y, curr_m) <= (end_y, end_m):
+            # 1. 해당 월의 요약 통계 계산 (services.py 로직 활용)
+            # ...
+            
+            from .services import compute_payroll_summary
+            summary = compute_payroll_summary(job, curr_y, curr_m)
+            
+            # 합산
+            cumulative_hours += summary['total_hours'] # 실제 + 예정 시간
+            
+            # 전체 예상 급여 (세전 -> 세후 반영 요청)
+            # summary['estimated_monthly_pay'] = base + night + holiday + weekly_holiday (세전)
+            # summary['net_pay'] = estimated - deductions (세후, 공제 방식 반영됨)
+            
+            # 사용자 요청: "공제 방식을 변경하면 업적합계도 변경되어야 함" 
+            # -> 업적 합계는 '실수령액 합계'여야 합니다.
+            cumulative_pay += summary['net_pay']
+            
+            # 3. 근무 일수 (actual + scheduled)
+            if 'rows' in summary:
+                 cumulative_days += len(summary['rows'])
+            
+            # 분리 집계 (디테일 UI용)
+            monthly_base = summary['base_pay'] + summary['night_bonus'] + summary['holiday_bonus']
+            cumulative_base_pay += monthly_base
+            cumulative_holiday_pay += summary['monthly_weekly_holiday_pay']
+            cumulative_night_pay += summary['night_bonus']
+            
+            # 다음 달로 이동
+            if curr_m == 12:
+                curr_y += 1
+                curr_m = 1
+            else:
+                curr_m += 1
+                
+        # [Fix] 시작일 ~ 오늘까지의 계산이므로, 미래의 달에 대한 루프는 돌지 않음. 
+        # 단, '오늘이 속한 달'은 포함되므로 이번 달 말일까지의 예상액은 포함됨.
+        
         return {
-            'total_hours': float(total_hours),
-            'total_earnings': float(total_earnings), # 순수 근로 기준
-            'total_work_days': total_work_days,
-            'total_confirmed_holiday_pay': total_confirmed_holiday_pay,
-            'achievement_total': achievement_total, # 세후 (공제 반영)
-            'total_gross_pay': gross_pay, # 세전
-            'total_deduction': total_deduction, # 공제액
-            'start_date': earliest.isoformat() if earliest else None,
-            'record_ids': record_ids,
-            'records_debug': records_debug,
-            # Phase 2 추가: 출결 상태별 통계
-            'regular_work_hours': float(regular_work_hours),
-            'regular_work_days': regular_work_days,
-            'regular_work_earnings': float(regular_work_earnings),
-            'extra_work_hours': float(extra_work_hours),
-            'extra_work_days': extra_work_days,
-            'extra_work_earnings': float(extra_work_earnings),
-            'annual_leave_days': annual_leave_days,
-            'absent_days': absent_days,
-            'sick_leave_days': sick_leave_days,
-            'annual_leave_summary': calculate_annual_leave_v2(job, today.year),
+            'total_hours': cumulative_hours,
+            'total_earnings': cumulative_base_pay, # 순수 근로 수당 (야간 포함되어 있음)
+            'total_confirmed_holiday_pay': cumulative_holiday_pay, # 주휴수당
+            'total_night_pay': cumulative_night_pay, # 야간수당 (별도 표기용)
+            'total_work_days': cumulative_days,
+            'achievement_total': cumulative_pay, # 총 합계 (UI의 큰 숫자)
+            'start_date': start_date.isoformat(),
+            
+            # 하위 호환성 필드 (0으로 채움)
+            'record_ids': [],
+            'records_debug': [],
+            'regular_work_hours': 0,
+            'regular_work_days': 0,
+            'regular_work_earnings': 0,
+            'extra_work_hours': 0,
+            'extra_work_days': 0,
+            'extra_work_earnings': 0,
+            'annual_leave_days': 0,
+            'absent_days': 0,
+            'sick_leave_days': 0,
+            'annual_leave_summary': {}, # 필요 시 별도 호출
         }
 
     @action(detail=True, methods=['get'], url_path='monthly-schedule')
@@ -1215,6 +1104,8 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                 })
         
         else:  # POST
+            from django.db import transaction
+            
             data = request.data
             year = data.get('year')
             month = data.get('month')
@@ -1231,101 +1122,121 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             except ValueError:
                 return Response({'error': 'year and month must be integers'}, status=status.HTTP_400_BAD_REQUEST)
             
-            # 해당 월의 기존 MonthlySchedule 모두 삭제
-            MonthlySchedule.objects.filter(
-                employee=job,
-                year=year,
-                month=month
-            ).delete()
-            
-            # 새 스케줄 생성
-            from datetime import datetime as dt
-            created_schedules = []
-            schedule_map = {}  # weekday -> schedule 매핑
-            
-            for schedule_data in schedules_data:
-                weekday = schedule_data.get('weekday')
-                start_time_str = schedule_data.get('start_time')
-                end_time_str = schedule_data.get('end_time')
-                enabled = schedule_data.get('enabled', True)
-                is_overnight = schedule_data.get('is_overnight', False)
-                next_day_work_minutes = int(schedule_data.get('next_day_work_minutes', 0))
-                break_minutes = int(schedule_data.get('break_minutes', 0))
+            with transaction.atomic():
+                # 해당 월의 날짜 범위 계산
+                _, last_day = pycal.monthrange(year, month)
+                start_date = date(year, month, 1)
+                end_date = date(year, month, last_day)
+
+                # 1. 해당 월의 기존 근로기록(WorkRecord) 모두 삭제
+                job.work_records.filter(
+                    work_date__gte=start_date,
+                    work_date__lte=end_date
+                ).delete()
                 
-                # 시간 문자열을 time 객체로 변환
-                start_time_obj = None
-                end_time_obj = None
-                
-                if enabled and start_time_str:
-                    try:
-                        start_time_obj = dt.strptime(start_time_str, '%H:%M').time()
-                    except ValueError:
-                        pass
-                
-                if enabled and end_time_str:
-                    try:
-                        end_time_obj = dt.strptime(end_time_str, '%H:%M').time()
-                    except ValueError:
-                        pass
-                
-                # enabled가 False이거나 시간이 없으면 비활성 상태로 저장
-                monthly_schedule = MonthlySchedule.objects.create(
+                # 2. 해당 월의 기존 MonthlySchedule 모두 삭제
+                MonthlySchedule.objects.filter(
                     employee=job,
                     year=year,
-                    month=month,
-                    weekday=weekday,
-                    start_time=start_time_obj,
-                    end_time=end_time_obj,
-                    is_overnight=is_overnight,
-                    next_day_work_minutes=next_day_work_minutes,
-                    break_minutes=break_minutes,
-                    enabled=enabled,
-                    weekly_rest_day=weekly_rest_day if isinstance(weekly_rest_day, int) else None
-                )
-                created_schedules.append(monthly_schedule)
+                    month=month
+                ).delete()
                 
-                # enabled된 스케줄만 매핑에 추가
-                if enabled and start_time_obj and end_time_obj:
-                    schedule_map[weekday] = monthly_schedule
-            
-            # 해당 월의 모든 날짜에 대해 근로기록 자동 생성
-            today = timezone.localdate()
-            _, last_day = pycal.monthrange(year, month)
-            created_records_count = 0
-            updated_empty_records_count = 0  # 초기화 추가
-            
-            for day in range(1, last_day + 1):
-                work_date = date(year, month, day)
+                # 새 스케줄 생성
+                from datetime import datetime as dt
+                created_schedules = []
+                schedule_map = {}  # weekday -> schedule 매핑
                 
-                # 미래 날짜는 건너뛰기 (오늘까지만)
-                if work_date > today:
-                    continue
-                
-                weekday = work_date.weekday()
-                
-                # 해당 요일의 스케줄이 있으면 근로기록 생성/업데이트
-                if weekday in schedule_map:
-                    schedule = schedule_map[weekday]
+                PROCESSED_WEEKDAYS = set()
+
+                for schedule_data in schedules_data:
+                    weekday = schedule_data.get('weekday')
+                    start_time_str = schedule_data.get('start_time')
+                    end_time_str = schedule_data.get('end_time')
                     
-                    # 기존 근로기록 확인
-                    existing_record = WorkRecord.objects.filter(
+                    is_active = schedule_data.get('enabled', True)
+                    
+                    is_overnight = schedule_data.get('is_overnight', False)
+                    next_day_work_minutes = int(schedule_data.get('next_day_work_minutes', 0))
+                    break_minutes = int(schedule_data.get('break_minutes', 0))
+                    
+                    start_time_obj = None
+                    end_time_obj = None
+                    
+                    if is_active and start_time_str:
+                        try:
+                            start_time_obj = dt.strptime(start_time_str, '%H:%M').time()
+                        except ValueError:
+                            pass
+                    
+                    if is_active and end_time_str:
+                        try:
+                            end_time_obj = dt.strptime(end_time_str, '%H:%M').time()
+                        except ValueError:
+                            pass
+                    
+                    monthly_schedule = MonthlySchedule.objects.create(
                         employee=job,
-                        work_date=work_date
-                    ).first()
+                        year=year,
+                        month=month,
+                        weekday=weekday,
+                        start_time=start_time_obj,  # None이면 '근무 없음'으로 판정
+                        end_time=end_time_obj,
+                        is_overnight=is_overnight,
+                        next_day_work_minutes=next_day_work_minutes,
+                        break_minutes=break_minutes,
+                        enabled=True, # 강제 활성화 (Override 적용)
+                        weekly_rest_day=weekly_rest_day if isinstance(weekly_rest_day, int) else None
+                    )
+                    created_schedules.append(monthly_schedule)
+                    PROCESSED_WEEKDAYS.add(weekday)
                     
-                    if not existing_record:
-                        # 스케줄의 시간 객체는 이미 time 타입
-                        # DateTime 객체 생성 (날짜 + 시간)
+                    if is_active and start_time_obj and end_time_obj:
+                        schedule_map[weekday] = monthly_schedule
+
+                # 누락된 요일도 '근무 없음'으로 Override 생성
+                for wd in range(7):
+                    if wd not in PROCESSED_WEEKDAYS:
+                        MonthlySchedule.objects.create(
+                            employee=job,
+                            year=year,
+                            month=month,
+                            weekday=wd,
+                            start_time=None,
+                            end_time=None,
+                            enabled=True
+                        )
+
+                # 해당 월의 모든 날짜에 대해 근로기록 자동 생성 (Active Days Only)
+                today = timezone.localdate()
+                created_records_count = 0
+                
+                # 입사일 정보 확인 (입사일 이전에는 기록 생성 방지)
+                job_start_date = job.start_date
+                
+                for day in range(1, last_day + 1):
+                    work_date = date(year, month, day)
+                    
+                    # 1) 입사일 이전이면 생성 금지 (Ghost Record 방지)
+                    if job_start_date and work_date < job_start_date:
+                        continue
+
+                    # 2) 미래 날짜는 건너뛰기
+                    if work_date > today:
+                        continue
+                    
+                    weekday = work_date.weekday()
+                    
+                    if weekday in schedule_map:
+                        schedule = schedule_map[weekday]
+                        
                         time_in_dt = datetime.combine(work_date, schedule.start_time)
                         
-                        # is_overnight이면 퇴근시간을 다음날로 설정
                         if schedule.is_overnight:
                             next_date = work_date + timedelta(days=1)
                             time_out_dt = datetime.combine(next_date, schedule.end_time)
                         else:
                             time_out_dt = datetime.combine(work_date, schedule.end_time)
                         
-                        # 새 근로기록 생성
                         WorkRecord.objects.create(
                             employee=job,
                             work_date=work_date,
@@ -1333,44 +1244,30 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                             time_out=time_out_dt,
                             is_overnight=schedule.is_overnight,
                             next_day_work_minutes=schedule.next_day_work_minutes,
-                            break_minutes=schedule.break_minutes
+                            break_minutes=schedule.break_minutes,
+                            attendance_status='REGULAR_WORK'
                         )
                         created_records_count += 1
-                    else:
-                        # 기존 기록이 0시간이라면 스케줄 시간으로 업데이트하여 복구
-                        try:
-                            if (not existing_record.time_in or not existing_record.time_out) or float(existing_record.get_total_hours()) == 0.0:
-                                existing_record.time_in = datetime.combine(work_date, schedule.start_time)
-                                
-                                # is_overnight이면 퇴근시간을 다음날로 설정
-                                if schedule.is_overnight:
-                                    next_date = work_date + timedelta(days=1)
-                                    existing_record.time_out = datetime.combine(next_date, schedule.end_time)
-                                else:
-                                    existing_record.time_out = datetime.combine(work_date, schedule.end_time)
-                                
-                                existing_record.is_overnight = schedule.is_overnight
-                                existing_record.next_day_work_minutes = schedule.next_day_work_minutes
-                                existing_record.break_minutes = schedule.break_minutes
-                                existing_record.save()
-                                updated_empty_records_count += 1
-                        except Exception:
-                            pass
+                
+                # [Safety Cleanup] 입사일 이전의 기록이 여전히 남아있다면 강제 삭제
+                # 이는 이전에 생성된 잘못된 기록(Ghost Records)을 청소하는 역할도 합니다.
+                if job_start_date:
+                    deleted_ghosts, _ = job.work_records.filter(work_date__lt=job_start_date).delete()
+                    if deleted_ghosts > 0:
+                        logger.info(f"Deleted {deleted_ghosts} ghost records before start date {job_start_date}")
             
-            # 최신 통계 및 캘린더 데이터 계산
+            # 최신 통계 계산 (트랜잭션 밖에서 수행해도 무방)
             from .services import compute_monthly_schedule_stats, monthly_scheduled_dates
             stats = compute_monthly_schedule_stats(job, year, month)
             dates = monthly_scheduled_dates(job, year, month)
-            
-            # 누적 통계도 함께 계산
             cumulative_stats = self.get_cumulative_stats_data(job)
             
             serializer = MonthlyScheduleSerializer(created_schedules, many=True)
             return Response({
-                'message': f'{year}년 {month}월 근무 스케줄이 저장되었습니다. ({created_records_count}건의 근로기록 생성)',
+                'message': f'{year}년 {month}월 근무 스케줄이 재설정되었습니다. ({created_records_count}건의 근로기록 생성)',
                 'schedules': serializer.data,
                 'created_records': created_records_count,
-                'updated_empty_records': updated_empty_records_count,
+                'updated_empty_records': 0,
                 'stats': stats,
                 'dates': dates,
                 'cumulative_stats': cumulative_stats
